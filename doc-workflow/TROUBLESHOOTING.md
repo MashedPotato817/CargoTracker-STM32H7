@@ -64,6 +64,16 @@ Size  : 0x00010000
 
 ---
 
+### 6. Task Stack Size 最小 128 Words
+
+**现象**：CubeMX 任务栈大小字段无法输入小于 128 的值。
+
+**原因**：FreeRTOS CMSIS_V2 强制最小 task 栈为 128 Words（512 字节）。
+
+**解决**：所有 task 栈均为 ≥ 128 Words。即使简单 task（如 LED 闪烁）也填 128，512B 对 STM32H7 的 1.4MB RAM 来说微不足道。
+
+---
+
 ## Git
 
 ### 6. CubeMX 重新生成后文件冲突

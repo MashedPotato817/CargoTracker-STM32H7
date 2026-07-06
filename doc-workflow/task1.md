@@ -19,7 +19,7 @@
 | `Task_GPS` | B | 中 | 512B | USART2 接收 + NMEA 解析 |
 | `Task_4G_MQTT` | B | 高 | 1KB | USART1 AT指令 + MQTT 收发 |
 | `Task_StateMachine` | C | 高 | 1KB | 状态机 + 低功耗管理 + 云指令分发 |
-| `Task_Alarm` | C | 低 | 256B | 蜂鸣器 + LED 控制 |
+| `Task_Alarm` | C | 低 | 512B | 蜂鸣器 + LED 控制 |
 
 ### 任务间通信
 
@@ -127,7 +127,7 @@ git add -A && git commit -m "before CubeMX FreeRTOS config"
 | Task_I2C_Sensors | osPriorityNormal | 128 | StartTask_I2C_Sensors | SHT30 + PN532 |
 | Task_GPS | osPriorityNormal | 128 | StartTask_GPS | GPS 接收解析 |
 | Task_Flash | osPriorityLow | 128 | StartTask_Flash | Flash 读写 |
-| Task_Alarm | osPriorityLow | 64 | StartTask_Alarm | LED + 蜂鸣器 |
+| Task_Alarm | osPriorityLow | 128 | StartTask_Alarm | LED + 蜂鸣器 |
 
 > Stack Size 单位是 **Words（4 bytes）**，所以 256 Words = 1KB，128 Words = 512B。
 > **Code Generation Option** 勾选 "As external" — 这样 task 函数声明在单独的文件，不污染 main.c。
