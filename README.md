@@ -103,6 +103,8 @@ while (1)
 
 详见 [`doc-workflow/task1.md`](doc-workflow/task1.md) — FreeRTOS 工程骨架 + 状态机框架 + 驱动 stub（无需外设即可开始）。
 
+> ⚠️ 遇到问题先查 [`doc-workflow/TROUBLESHOOTING.md`](doc-workflow/TROUBLESHOOTING.md)（团队踩坑记录），解决后往里面补充。
+
 ### FreeRTOS 任务架构（6 Task + 3 Queue）
 
 | Task | 优先级 | 职责 |

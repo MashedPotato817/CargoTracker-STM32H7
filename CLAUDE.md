@@ -152,5 +152,6 @@ Size  : 0x00010000
 | `doc/STM32H7A3ZI-Q_程序下载要点.md` | Keil 烧录详细步骤 |
 | `doc/STM32H7_CubeMX_Config.md` | CubeMX 引脚/时钟/DMA 完整配置 |
 | `doc/STM32H7_Logistics_System.md` | 完整设计方案（BOM/接线/电源/状态机） |
-| `doc-workflow/task1.md` | 第一轮开发计划（FreeRTOS + 状态机 + stub） |
+| `doc-workflow/task1.md` | 第一轮开发计划（FreeRTOS + 状态机 + stub，含 15 步详细操作） |
+| `doc-workflow/TROUBLESHOOTING.md` | 团队踩坑记录（CubeMX/Keil/FreeRTOS/Git 常见问题） |
 | `.claude/projects/` | Claude Code 项目记忆（MCU/开发板参考资料） |

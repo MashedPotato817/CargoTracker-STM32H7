@@ -52,19 +52,270 @@ Task_StateMachine ──(缓存数据)──→ Task_Flash
 
 ### 第 1 步：CubeMX FreeRTOS 工程 + Task 骨架
 
-**CubeMX 配置：**
-- FreeRTOS CMSIS_V2 使能
-- 6 个 task 定义（名称/优先级/栈大小如上表）
-- 3 条队列定义
-- USART3（ST-LINK VCP PD8/PD9）用于 printf 调试输出
-- 板载 LED（PB0/PE1/PB14）和按键（PC13 EXTI）配置
+#### 1-1 备份现有工程
 
-**框架代码：**
-- `main.c` — 只做初始化，不写逻辑
-- 每个 task 骨架 — 死循环 + `printf("Task xxx heartbeat\n")` + `osDelay()`
-- 按键中断 — EXTI 回调中发送队列消息
+```bash
+# 在开始前先提交当前 git 状态，方便回退
+cd Project
+git add -A && git commit -m "before CubeMX FreeRTOS config"
+```
 
-**验证：** 串口终端打印 6 个 task 心跳，确认 FreeRTOS 调度正常。按键触发后打印消息。
+#### 1-2 CubeMX 打开工程
+
+双击 `test1/test1.ioc`，用 STM32CubeMX 打开。
+
+> ⚠️ CubeMX 版本建议 6.12+ ，否则 FreeRTOS CMSIS_V2 选项位置可能不同。
+
+#### 1-3 引脚配置（Pinout）
+
+| 引脚 | 功能 | 模式 | 说明 |
+|------|------|------|------|
+| PB0 | GPIO_Output | Push-Pull | LD1 绿灯 — 系统心跳 |
+| PE1 | GPIO_Output | Push-Pull | LD2 黄灯 — 报警 |
+| PB14 | GPIO_Output | Push-Pull | LD3 红灯 — 联网/传输 |
+| PC13 | GPIO_Input | Pull-up, EXTI (falling edge) | 用户按键 — 模拟 NFC 激活 |
+| PD8 | USART3_TX | Asynchronous | ST-LINK VCP — 调试输出 |
+| PD9 | USART3_RX | Asynchronous | ST-LINK VCP |
+
+> 其余引脚（USART1/2, I2C1, SPI1）暂不配置，stub 阶段用不到。
+
+**User Label 建议：**
+
+| 引脚 | User Label |
+|------|-----------|
+| PB0 | LD1_GREEN |
+| PE1 | LD2_YELLOW |
+| PB14 | LD3_RED |
+| PC13 | BTN_USER |
+
+#### 1-4 时钟配置（Clock Configuration）
+
+保持与现有工程一致：
+- HSE: 8 MHz（外部晶振）
+- SYSCLK: 280 MHz
+- AHB: 140 MHz
+- APB1: 70 MHz, APB2: 140 MHz
+
+> 注意：NUCLEO-H7A3ZI-Q 板载 **无 HSE 晶振**。CubeMX 默认启用 HSE 会导致编译通过但运行时卡在时钟初始化。实际使用 HSI（内部 64MHz RC），在 Clock Configuration 中将 PLL Source Mux 选为 HSI 而非 HSE。SYSCLK 可以设为 280 MHz（通过 PLL 倍频 HSI）。
+
+#### 1-5 USART3 配置
+
+| 参数 | 值 |
+|------|-----|
+| Mode | Asynchronous |
+| Baud Rate | 115200 |
+| Word Length | 8 Bits |
+| Parity | None |
+| Stop Bits | 1 |
+
+#### 1-6 使能 FreeRTOS
+
+1. **Pinout & Configuration** → **Middleware** → **FREERTOS**
+2. Interface 选 **CMSIS_V2**
+3. 保持默认参数，后续再调
+
+**TOTAL_HEAP_SIZE** 默认约 15KB，本项目够用，不改。
+
+#### 1-7 创建 6 个 Task
+
+**Tasks and Queues** 标签页 → **Tasks** → 逐个添加：
+
+| Task Name | Priority | Stack Size (Words) | Entry Function | 说明 |
+|-----------|----------|-------------------|----------------|------|
+| Task_StateMachine | osPriorityHigh | 256 | StartTask_StateMachine | 状态机 + 指令分发 |
+| Task_4G_MQTT | osPriorityHigh | 256 | StartTask_4G_MQTT | 4G AT + MQTT |
+| Task_I2C_Sensors | osPriorityNormal | 128 | StartTask_I2C_Sensors | SHT30 + PN532 |
+| Task_GPS | osPriorityNormal | 128 | StartTask_GPS | GPS 接收解析 |
+| Task_Flash | osPriorityLow | 128 | StartTask_Flash | Flash 读写 |
+| Task_Alarm | osPriorityLow | 64 | StartTask_Alarm | LED + 蜂鸣器 |
+
+> Stack Size 单位是 **Words（4 bytes）**，所以 256 Words = 1KB，128 Words = 512B。
+> **Code Generation Option** 勾选 "As external" — 这样 task 函数声明在单独的文件，不污染 main.c。
+
+#### 1-8 创建 3 条 Queue
+
+**Tasks and Queues** 标签页 → **Queues** → 逐个添加：
+
+| Queue Name | Size | Item Size | Allocation | Buffer Name | Control Block |
+|-----------|------|-----------|------------|-------------|---------------|
+| queue_activation | 16 | uint16_t | Dynamic | NULL | NULL |
+| queue_sensor_data | 16 | uint32_t | Dynamic | NULL | NULL |
+| queue_cloud_cmd | 8 | uint16_t | Dynamic | NULL | NULL |
+
+> Item Size: `uint16_t` 用于传枚举值/命令；`uint32_t` 用于传数据指针（温湿度/GPS 是 struct 指针）。
+> Dynamic = FreeRTOS 自动从 heap 分配，缓冲区不用手动创建。
+
+#### 1-9 生成代码
+
+1. **Project Manager** → **Code Generator** → 勾选 **"Generate peripheral initialization as a pair of .c/.h files"**
+2. 点击 **GENERATE CODE**（齿轮图标）
+3. 提示覆盖时确认。
+
+> ⚠️ 生成完成后 CubeMX 会弹出对话框问是否打开工程，选 **"Open Project"** 或直接关闭用 Keil 手动打开。如果用 CubeMX 内建的 STM32CubeIDE 打开会报错（因为工程是 Keil MDK 格式），忽略即可。
+
+#### 1-10 Keil 打开 + 编译验证
+
+1. 双击 `test1/MDK-ARM/test1.uvprojx` 在 Keil MDK 中打开
+2. **F7** 编译
+3. 预期结果：0 Error(s), 0 Warning(s)
+
+> 如果报 `Cannot Load Flash Programming Algorithm`：参考 `doc/STM32H7A3ZI-Q_程序下载要点.md`，设置 RAM for Algorithm Start: 0x24000000 Size: 0x00010000。
+>
+> 如果报 HSE 相关错误：回到 CubeMX 把 PLL Source Mux 从 HSE 改为 HSI，重新生成。
+
+#### 1-11 重定向 printf 到 USART3
+
+CubeMX 生成的 `usart.c` 只有 `MX_USART3_UART_Init()`，没有 printf 重定向。
+
+在 `main.c` 的 `/* USER CODE BEGIN 0 */` 段添加：
+
+```c
+/* USER CODE BEGIN 0 */
+#include <stdio.h>
+
+#ifdef __GNUC__
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif
+
+PUTCHAR_PROTOTYPE
+{
+    HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    return ch;
+}
+/* USER CODE END 0 */
+```
+
+#### 1-12 编写 Task 骨架代码
+
+在 `main.c` 的 `/* USER CODE BEGIN 4 */` 段添加 6 个 task 入口函数。
+
+> CubeMX 生成了 "As external" 的 task 声明，但函数体仍然需要手动写。声明在 `freertos.c`，函数体可以在 `freertos.c` 的 USER CODE 区补充，也可以集中在 `main.c` 的 USER CODE 4 区。建议**全部写在 `freertos.c` 的 USER CODE 区**，保持 main.c 干净。
+
+打开 `freertos.c`，在每个 task 对应的 `/* USER CODE BEGIN xxx */` 段写入：
+
+```c
+/* USER CODE BEGIN StartTask_StateMachine */
+void StartTask_StateMachine(void *argument)
+{
+    for (;;) {
+        printf("[StateMachine] heartbeat\n");
+        osDelay(1000);
+    }
+}
+/* USER CODE END StartTask_StateMachine */
+
+/* USER CODE BEGIN StartTask_4G_MQTT */
+void StartTask_4G_MQTT(void *argument)
+{
+    for (;;) {
+        printf("[4G_MQTT] heartbeat\n");
+        osDelay(2000);
+    }
+}
+/* USER CODE END StartTask_4G_MQTT */
+
+/* USER CODE BEGIN StartTask_I2C_Sensors */
+void StartTask_I2C_Sensors(void *argument)
+{
+    for (;;) {
+        printf("[I2C_Sensors] heartbeat\n");
+        osDelay(3000);
+    }
+}
+/* USER CODE END StartTask_I2C_Sensors */
+
+/* USER CODE BEGIN StartTask_GPS */
+void StartTask_GPS(void *argument)
+{
+    for (;;) {
+        printf("[GPS] heartbeat\n");
+        osDelay(3000);
+    }
+}
+/* USER CODE END StartTask_GPS */
+
+/* USER CODE BEGIN StartTask_Flash */
+void StartTask_Flash(void *argument)
+{
+    for (;;) {
+        printf("[Flash] heartbeat\n");
+        osDelay(5000);
+    }
+}
+/* USER CODE END StartTask_Flash */
+
+/* USER CODE BEGIN StartTask_Alarm */
+void StartTask_Alarm(void *argument)
+{
+    for (;;) {
+        printf("[Alarm] heartbeat\n");
+        osDelay(5000);
+    }
+}
+/* USER CODE END StartTask_Alarm */
+```
+
+#### 1-13 编写按键中断回调
+
+在 `main.c` 的 `/* USER CODE BEGIN 4 */` 段添加 GPIO EXTI 回调（放在 task 函数下方）：
+
+```c
+/* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_13) {
+        uint16_t event = 1;  // 1 = NFC 激活事件
+        osMessageQueuePut(queue_activationHandle, &event, 0, 0);
+        printf("[BTN] NFC activation event sent\n");
+        
+        // 消抖：简单处理（正式版用定时器消抖）
+        HAL_Delay(50);
+        while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_13) == GPIO_PIN_RESET);
+    }
+}
+/* USER CODE END 4 */
+```
+
+#### 1-14 编译 + 烧录验证
+
+1. **F7** 编译 → 0 Error(s)
+2. **Ctrl+F8** 烧录
+3. 打开串口助手（115200-8-N-1），按 RESET 键
+4. 预期输出：
+
+```
+[StateMachine] heartbeat
+[4G_MQTT] heartbeat
+[I2C_Sensors] heartbeat
+[GPS] heartbeat
+[Flash] heartbeat
+[Alarm] heartbeat
+[StateMachine] heartbeat
+...
+```
+
+5. 按下用户按键（PC13），输出：
+
+```
+[BTN] NFC activation event sent
+```
+
+#### 1-15 提交
+
+```bash
+git add -A && git commit -m "CubeMX FreeRTOS: 6 task + 3 queue + printf heartbeat OK"
+```
+
+---
+
+**Step 1 完成标准：**
+- [x] CubeMX 生成 FreeRTOS 工程，编译 0 Error
+- [x] 6 个 task 心跳串口可见
+- [x] 按键中断 → 队列消息 → 串口打印
+
+---
 
 ### 第 2 步：状态机 + 应用层
 
