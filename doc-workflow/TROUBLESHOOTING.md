@@ -74,6 +74,31 @@ Size  : 0x00010000
 
 ---
 
+### 7. ARM Compiler 6 + FreeRTOS RVDS port = 177 个编译错误
+
+**现象**：编译报大量 `__forceinline` / `__asm` unknown type / `PRESERVE8` undeclared 错误（~177 个），所有 FreeRTOS 源文件都报。
+
+**原因**：CubeMX 默认添加 FreeRTOS 的 `RVDS` port（ARM_CM4F 或 ARM_CM7），RVDS = ARM Compiler 5 (armcc) 语法。Keil 如果选了 **ARM Compiler 6 (V6.x / armclang)**，不认 `__forceinline`、`__asm` 等 AC5 关键字。
+
+**解决**：改用 `GCC/ARM_CM7` port（armclang 兼容 GCC 语法）。
+
+三步操作（以 STM32H7 为例）：
+
+1. **复制 GCC port 文件** — 从 `STM32Cube_FW_H7_Vx.x.x/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1/` 复制 `port.c` + `portmacro.h` 到工程的同路径 `portable/GCC/ARM_CM7/r0p1/` 下
+
+2. **修改 uvprojx**（或 Keil 界面操作）：
+   - Include Path：`RVDS\ARM_CM7\r0p1` → `GCC\ARM_CM7\r0p1`
+   - port.c 文件引用：`RVDS\ARM_CM7\r0p1\port.c` → `GCC\ARM_CM7\r0p1\port.c`
+
+3. **Keil 重开工程 → Rebuild all**
+
+**验证**：编译 0 错误。
+
+> 注意 1：H7 是 Cortex-M7，ARM_CM7 里还有 `r0p1` 子文件夹（区分内核版本），Include Path 要写到底层 `r0p1` 目录。  
+> 注意 2：如果 CubeMX 重新生成代码，可能会恢复 Include Path，需要重新改一回。可在 CLAUDE.md 中注明此操作。
+
+---
+
 ## Git
 
 ### 6. CubeMX 重新生成后文件冲突
