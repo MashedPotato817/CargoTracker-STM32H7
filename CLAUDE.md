@@ -45,8 +45,25 @@ USB 5V → TP4056(充电+保护) → 18650锂电池
 ### 软件分层
 
 ```
-main.c → APP层(状态机/报警/低功耗) → Driver层(UART/I2C/SPI/GPIO) → HAL库 → STM32
+main.c → FreeRTOS(Task调度/队列通信) → APP层(状态机/报警/低功耗) → Driver层(UART/I2C/SPI/GPIO) → HAL库 → STM32
 ```
+
+### FreeRTOS 任务架构（6 Task + 3 Queue）
+
+| Task | 负责人 | 优先级 | 职责 |
+|------|--------|--------|------|
+| Task_I2C_Sensors | A | 中 | SHT30 + PN532（共享 I2C1，同 task 无竞态） |
+| Task_Flash | A | 低 | W25Q128 读写缓存 |
+| Task_GPS | B | 中 | USART2 接收 + NMEA 解析 |
+| Task_4G_MQTT | B | 高 | USART1 AT指令 + MQTT |
+| Task_StateMachine | C | 高 | 状态机 + 低功耗 + 云指令分发 |
+| Task_Alarm | C | 低 | 蜂鸣器 + LED |
+
+3 条队列：`queue_activation`（NFC→状态机）、`queue_sensor_data`（传感器数据→状态机）、`queue_cloud_cmd`（MQTT→状态机）
+
+### 开发策略
+
+**硬件只有开发板时**：所有驱动用 stub 实现（返回模拟数据），先跑通 FreeRTOS 调度 + 状态机 + 任务通信全流程。硬件到后替换驱动内部实现，接口不变，应用层零改动。
 
 ### 模块接口规范
 
@@ -69,15 +86,20 @@ temp = SHT30_ReadTemperature();
 ### 目标代码结构
 
 ```
-├── APP/          main.c, app.c, state_machine.c, power.c, alarm.c
-├── SENSOR/       sht30.c
-├── NFC/          pn532.c
-├── GPS/          gps.c
-├── AIR780E/      air780e.c, mqtt.c
-├── FLASH/        w25q128.c
-├── BSP/          bsp_uart.c, bsp_spi.c, bsp_i2c.c
-├── Drivers/      (STM32 HAL + CMSIS，不手动修改)
-└── Middlewares/  (FreeRTOS 可选)
+test1/Core/
+├── Inc/
+│   ├── main.h, FreeRTOSConfig.h
+│   └── app/        app.h, state_machine.h, alarm.h, power.h
+└── Src/
+    ├── main.c      (初始化 + FreeRTOS task 创建，全部在 USER CODE 段内)
+    ├── app/        app.c, state_machine.c, alarm.c, power.c    ← 成员 C
+    ├── sensor/     sht30.c                                     ← 成员 A
+    ├── nfc/        pn532.c                                     ← 成员 A
+    ├── flash/      w25q128.c                                   ← 成员 A
+    ├── gps/        gps.c                                       ← 成员 B
+    └── air780e/    air780e.c, mqtt.c                           ← 成员 B
+├── Drivers/        (STM32 HAL + CMSIS，不手动修改)
+└── Middlewares/    FreeRTOS (CMSIS_V2)
 ```
 
 ## 开发操作
@@ -125,9 +147,10 @@ Size  : 0x00010000
 
 | 文件 | 内容 |
 |------|------|
-| `demand.md` | 需求文档（一句话描述项目） |
-| `task.md` | 三人分工方案、接口规范、开发顺序 |
-| `STM32H7A3ZI-Q_程序下载要点.md` | Keil 烧录详细步骤 |
-| `STM32H7_CubeMX_Config.md` | CubeMX 引脚/时钟/DMA 完整配置 |
-| `STM32H7_Logistics_System.md` | 完整设计方案（BOM/接线/电源/状态机） |
 | `README.md` | 项目介绍和快速开始 |
+| `doc/task.md` | 三人分工方案、接口规范、开发顺序 |
+| `doc/STM32H7A3ZI-Q_程序下载要点.md` | Keil 烧录详细步骤 |
+| `doc/STM32H7_CubeMX_Config.md` | CubeMX 引脚/时钟/DMA 完整配置 |
+| `doc/STM32H7_Logistics_System.md` | 完整设计方案（BOM/接线/电源/状态机） |
+| `doc-workflow/task1.md` | 第一轮开发计划（FreeRTOS + 状态机 + stub） |
+| `.claude/projects/` | Claude Code 项目记忆（MCU/开发板参考资料） |

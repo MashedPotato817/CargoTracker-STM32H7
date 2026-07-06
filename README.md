@@ -99,6 +99,21 @@ while (1)
 
 若绿色 LED 以 0.5 秒间隔闪烁，说明 ST-Link、Flash 下载、BSP 配置均正常。
 
+## 当前开发阶段
+
+详见 [`doc-workflow/task1.md`](doc-workflow/task1.md) — FreeRTOS 工程骨架 + 状态机框架 + 驱动 stub（无需外设即可开始）。
+
+### FreeRTOS 任务架构（6 Task + 3 Queue）
+
+| Task | 优先级 | 职责 |
+|------|--------|------|
+| Task_StateMachine | 高 | 状态机调度 + 低功耗 + 云指令分发 |
+| Task_4G_MQTT | 高 | USART1 AT指令 + MQTT 收发 |
+| Task_I2C_Sensors | 中 | SHT30 + PN532（共享 I2C1） |
+| Task_GPS | 中 | USART2 + NMEA 解析 |
+| Task_Flash | 低 | W25Q128 读写缓存 |
+| Task_Alarm | 低 | LED + 蜂鸣器 |
+
 ## 学习路线
 
 按顺序掌握以下外设驱动，逐步完成系统：
@@ -106,11 +121,12 @@ while (1)
 1. LED 点灯 — GPIO 输出
 2. 按键中断 — EXTI
 3. USART 串口 — 调试输出
-4. 定时器 — TIM
-5. I2C — SHT30 温湿度传感器
-6. SPI — NFC 模块
-7. UART — GPS 模块
-8. MQTT — 云平台通信
+4. FreeRTOS — 多任务调度 + 队列通信
+5. 定时器 — TIM
+6. I2C — SHT30 温湿度传感器
+7. SPI — NFC 模块
+8. UART — GPS 模块
+9. MQTT — 云平台通信
 
 ## 开发注意事项
 
