@@ -32,20 +32,23 @@
 
 ```
 CargoTracker-STM32H7/
-├── test1/                        # STM32CubeMX 生成的工程（Keil MDK）
-│   ├── Core/                     # 核心代码
-│   │   ├── Inc/                  #   头文件
-│   │   └── Src/                  #   源文件
-│   ├── Drivers/                  # HAL 驱动 + BSP + CMSIS
-│   ├── MDK-ARM/                  # Keil MDK 项目文件
-│   └── test1.ioc                 # CubeMX 配置（修改外设后重新生成）
-├── CLAUDE.md                     # 项目指引（供 Claude Code 使用）
-├── demand.md                     # 需求文档
-├── STM32H7A3ZI-Q_程序下载要点.md # 烧录指导
-└── README.md                     # 本文件
+├── .claude/                       # Claude Code 配置
+├── .git/                          # Git 仓库
+├── .gitignore                     # Git 忽略规则
+├── CLAUDE.md                      # 项目指引（供 Claude Code 使用）
+├── README.md                      # 本文件
+├── doc/                           # 文档目录
+│   ├── task.md                    # 三人分工方案、接口规范、开发顺序
+│   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录详细步骤
+│   ├── STM32H7_CubeMX_Config.md   # CubeMX 引脚/时钟/DMA 完整配置
+│   └── STM32H7_Logistics_System.md # 完整设计方案（BOM/接线/电源/状态机）
+└── test1/                         # STM32CubeMX 生成的工程（Keil MDK）
+    ├── Core/                      # 核心代码
+    │   ├── Inc/                   #   头文件
+    │   └── Src/                   #   源文件
+    ├── Drivers/                   # HAL 驱动 + CMSIS（不手动修改）
+    └── MDK-ARM/                   # Keil MDK 项目文件
 ```
-
-> `test1/` 为 CubeMX 生成的标准工程，已加入 `.gitignore`，初次使用需通过 CubeMX 重新生成或从归档恢复。
 
 ## 快速开始
 
