@@ -160,7 +160,7 @@ Size  : 0x00010000
 | 文件 | 内容 |
 |------|------|
 | `README.md` | 项目介绍和快速开始 |
-| `doc/task.md` | 三人分工方案、接口规范 |
+| `doc-workflow/archive/original_team_proposal.md` | （历史）原始团队分工提案 |
 | `doc/STM32H7A3ZI-Q_程序下载要点.md` | Keil 烧录详细步骤 |
 | `doc/STM32H7_CubeMX_Config.md` | CubeMX 引脚/时钟/DMA 完整配置 |
 | `doc/STM32H7_Logistics_System.md` | 完整设计方案（BOM/接线/电源/状态机） |
