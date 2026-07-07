@@ -56,7 +56,7 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(W25Q128_CS_GPIO_Port, W25Q128_CS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD1_GREEN_Pin|LD3_RED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, AIR780E_PWRKEY_Pin|LD3_RED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, BUZZER_Pin|ALARM_LED_Pin, GPIO_PIN_RESET);
@@ -77,8 +77,8 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(W25Q128_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD1_GREEN_Pin LD3_RED_Pin */
-  GPIO_InitStruct.Pin = LD1_GREEN_Pin|LD3_RED_Pin;
+  /*Configure GPIO pins : AIR780E_PWRKEY_Pin LD3_RED_Pin */
+  GPIO_InitStruct.Pin = AIR780E_PWRKEY_Pin|LD3_RED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

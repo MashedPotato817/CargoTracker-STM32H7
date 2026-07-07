@@ -112,16 +112,17 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ---
 
-## Task 2.6: PB0 冲突解决 ❌ 未开始
+## Task 2.6: PB0 冲突解决 🔧 进行中
 
-**负责人：C** | 状态：最高优先级阻塞项
+**负责人：C** | 状态：CubeMX 部分完成，代码侧待做
 
-- [ ] CubeMX：PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
-- [ ] CubeMX：系统心跳迁移到 PE1（LD2_YELLOW）
-- [ ] alarm.c：PE1 心跳慢闪（1s周期）= 系统正常，快闪（200ms周期）= 报警
-- [ ] power.c：`AIR780E_PWRKEY_GPIO_Port/Pin` 宏已定义
-- [ ] power.c：`Power_Air780E_SetPwrKey()` 控制函数
-- [ ] 编译 → 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
+- [x] CubeMX：PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
+- [x] CubeMX：心跳保持 PE1（LD2_YELLOW）不变
+- [x] `main.h`：自动生成 `AIR780E_PWRKEY_Pin/Port` 宏
+- [ ] `power.c`：pwrkey 时序实现（>1s 低脉冲开关机）
+- [ ] `alarm.c`：启用 PC8 蜂鸣器 + PC9 外接 LED（引脚已配置）
+- [ ] Keil 编译 0 Error 0 Warning
+- [ ] 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
 - [ ] 通知 B 组 PB0 已可用 → 解除 2.5 阻塞
 
 ---
@@ -154,15 +155,21 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ## 文件变更清单
 
-| 文件 | 操作 | 负责人 |
-|------|------|--------|
-| `test1/test1.ioc` | 修改（使能外设） | A |
-| `test1/Core/Inc/FreeRTOSConfig.h` | 修改（FPU=1） | A |
-| `test1/Core/Src/sensor/sht31.c` | 验证（flag=1） | A |
-| `test1/Core/Src/nfc/pn532.c` | 验证（flag=1） | A |
-| `test1/Core/Src/flash/w25q128.c` | 验证（flag=1） | A |
-| `test1/Core/Src/gps/gps.c` | 修改（USART2 替代 stub） | B |
-| `test1/Core/Src/air780e/air780e.c` | 修改（USART1 替代 stub） | B |
-| `test1/Core/Src/air780e/mqtt.c` | 修改（真实 AT 交互） | B |
-| `test1/Core/Src/app/alarm.c` | 修改（LED 模式调整） | C |
-| `test1/Core/Src/app/app.c` | 修改（PWRKEY 控制） | C |
+| 文件 | 操作 | 负责人 | 状态 |
+|------|------|--------|------|
+| `test1/test1.ioc` | 修改（使能外设 + PB0→PWRKEY） | A → C | ✅ 已完成 |
+| `test1/Core/Inc/FreeRTOSConfig.h` | 修改（FPU=1） | A | ✅ 已设置 |
+| `test1/Core/Src/sensor/sht31.c` | 验证（flag=1） | A | ⚠️ 待硬件 |
+| `test1/Core/Src/nfc/pn532.c` | 验证（flag=1） | A | ⚠️ 待硬件 |
+| `test1/Core/Src/flash/w25q128.c` | 验证（flag=1） | A | ⚠️ 待硬件 |
+| `test1/Core/Src/gps/gps.c` | 修改（USART2 替代 stub） | B | ✅ 代码完成 |
+| `test1/Core/Src/air780e/air780e.c` | 修改（USART1 替代 stub） | B | ✅ 代码完成 |
+| `test1/Core/Src/air780e/mqtt.c` | 修改（真实 AT 交互） | B | ✅ 代码完成 |
+| `test1/Core/Src/app/alarm.c` | 修改（PC8蜂鸣器+PC9 LED） | C | 🔧 待实现 |
+| `test1/Core/Src/app/power.c` | 修改（PWRKEY 时序） | C | 🔧 待实现 |
+| `test1/Core/Inc/main.h` | 补充引脚宏 | C | ✅ 已完成 |
+| `test1/Core/Inc/usart.h` | 补充 huart1/2 声明 | C | ✅ 已完成 |
+| `test1/Core/Src/usart.c` | 补充 USART1/2 初始化 | C | ✅ 已完成 |
+| `test1/Core/Src/gpio.c` | 补充 W25Q128_CS/Buzzer/LED | C | ✅ 已完成 |
+| `test1/Core/Inc/stm32h7xx_hal_conf.h` | 启用 SPI 模块 | C | ✅ 已完成 |
+| `test1/MDK-ARM/test1.uvprojx` | 修复 IncludePath/Flash/port.c | C | ✅ 已完成 |

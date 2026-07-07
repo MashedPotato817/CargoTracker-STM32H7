@@ -65,10 +65,10 @@ void Error_Handler(void);
 #define PH0_MCU_GPIO_Port GPIOH
 #define PH1_MCU_Pin GPIO_PIN_1
 #define PH1_MCU_GPIO_Port GPIOH
+#define AIR780E_PWRKEY_Pin GPIO_PIN_0
+#define AIR780E_PWRKEY_GPIO_Port GPIOB
 #define W25Q128_CS_Pin GPIO_PIN_4
 #define W25Q128_CS_GPIO_Port GPIOA
-#define LD1_GREEN_Pin GPIO_PIN_0
-#define LD1_GREEN_GPIO_Port GPIOB
 #define LD3_RED_Pin GPIO_PIN_14
 #define LD3_RED_GPIO_Port GPIOB
 #define BUZZER_Pin GPIO_PIN_8
