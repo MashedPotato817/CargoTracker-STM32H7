@@ -123,6 +123,13 @@ CRC8 校验通过，温度读数验证正常（~26°C）。
 - ❌ 直接 push 到 main
 - ❌ 不 rebase 就提 PR（冲突留给 reviewer）
 - ❌ 手动修改 `Drivers/` 目录文件
+- ❌ **提交 `Drivers/` 或 `Middlewares/` 下任何文件**（已被 gitignore，`git add -f` 也不行）
 - ❌ 同时修改 `.ioc` 不沟通
 - ❌ PR 合并后不删 feature 分支
 - ❌ 提交编译产物（.o, .axf, .hex, .map）
+
+### 如何防止误提交 Drivers/Middlewares
+
+1. `.gitignore` 已排除这两个目录，正常 `git add` 不会包含
+2. 如 IDE 自动 stage 了这些文件，**不要 commit**，检查 `.gitignore` 是否最新
+3. Review 时特别注意 PR 中是否有 `test1/Drivers/` 或 `test1/Middlewares/` 路径的文件
