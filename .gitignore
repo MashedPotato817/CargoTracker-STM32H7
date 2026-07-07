@@ -51,6 +51,3 @@ test1/Core/Inc/stm32h7xx_nucleo_conf.h
 *.tmp
 .DS_Store
 Thumbs.db
-test1/test1.ioc
-test1/MDK-ARM/test1.uvprojx
-test1/Core/Src/system_stm32h7xx.c
