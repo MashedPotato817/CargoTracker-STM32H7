@@ -8,7 +8,7 @@
  * and generates Core/Inc/i2c.h with hi2c1.
  */
 #ifndef PN532_USE_HAL_I2C
-#define PN532_USE_HAL_I2C 0
+#define PN532_USE_HAL_I2C 1
 #endif
 
 void PN532_Init(void);

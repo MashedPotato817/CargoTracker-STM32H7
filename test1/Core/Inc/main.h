@@ -65,15 +65,20 @@ void Error_Handler(void);
 #define PH0_MCU_GPIO_Port GPIOH
 #define PH1_MCU_Pin GPIO_PIN_1
 #define PH1_MCU_GPIO_Port GPIOH
+#define W25Q128_CS_Pin GPIO_PIN_4
+#define W25Q128_CS_GPIO_Port GPIOA
 #define LD1_GREEN_Pin GPIO_PIN_0
 #define LD1_GREEN_GPIO_Port GPIOB
 #define LD3_RED_Pin GPIO_PIN_14
 #define LD3_RED_GPIO_Port GPIOB
+#define BUZZER_Pin GPIO_PIN_8
+#define BUZZER_GPIO_Port GPIOC
+#define ALARM_LED_Pin GPIO_PIN_9
+#define ALARM_LED_GPIO_Port GPIOC
 #define LD2_YELLOW_Pin GPIO_PIN_1
 #define LD2_YELLOW_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
-
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -3,11 +3,56 @@
 #include <stdio.h>
 #include <string.h>
 
+#if AIR780E_USE_HAL_UART
+#include "usart.h"
+#endif
+
+#define AIR780E_RX_BUFFER_SIZE 160U
+#define AIR780E_RX_POLL_MS 20U
+
 static uint8_t network_ready = 0;
 static uint8_t signal_quality = 0;
+static char at_response[AIR780E_RX_BUFFER_SIZE];
 
 static uint8_t Air780E_SendAT(const char *command, const char *expected, uint32_t timeout_ms)
 {
+#if AIR780E_USE_HAL_UART
+    char tx_buffer[48];
+    uint8_t ch = 0U;
+    uint32_t pos = 0U;
+    uint32_t start_tick;
+    uint32_t tx_len;
+
+    tx_len = (uint32_t)snprintf(tx_buffer, sizeof(tx_buffer), "%s\r\n", command);
+    if (HAL_UART_Transmit(&huart1, (uint8_t *)tx_buffer, (uint16_t)tx_len, timeout_ms) != HAL_OK) {
+        return 0U;
+    }
+
+    at_response[0] = '\0';
+    start_tick = HAL_GetTick();
+
+    printf("[Air780E] >> %s\n", command);
+
+    while ((HAL_GetTick() - start_tick) < timeout_ms) {
+        if (HAL_UART_Receive(&huart1, &ch, 1U, AIR780E_RX_POLL_MS) != HAL_OK) {
+            continue;
+        }
+
+        if (pos < (sizeof(at_response) - 1U)) {
+            at_response[pos] = (char)ch;
+            pos++;
+            at_response[pos] = '\0';
+        }
+
+        if (strstr(at_response, expected) != NULL) {
+            printf("[Air780E] << %s\n", at_response);
+            return 1U;
+        }
+    }
+
+    printf("[Air780E] << timeout/no match\n");
+    return 0U;
+#else
     const char *response = "OK";
 
     (void)timeout_ms;
@@ -22,8 +67,10 @@ static uint8_t Air780E_SendAT(const char *command, const char *expected, uint32_
 
     printf("[Air780E] >> %s\n", command);
     printf("[Air780E] << %s\n", response);
+    (void)snprintf(at_response, sizeof(at_response), "%s", response);
 
     return (strstr(response, expected) != NULL) ? 1U : 0U;
+#endif
 }
 
 static uint8_t Air780E_ParseSignalQuality(const char *response)
@@ -47,6 +94,19 @@ static uint8_t Air780E_ParseSignalQuality(const char *response)
     return 1U;
 }
 
+static uint8_t Air780E_IsRegistered(const char *response)
+{
+    if (strstr(response, "+CREG: 0,1") != NULL) {
+        return 1U;
+    }
+
+    if (strstr(response, "+CREG: 0,5") != NULL) {
+        return 1U;
+    }
+
+    return 0U;
+}
+
 void Air780E_Init(void)
 {
     uint8_t at_ok;
@@ -54,14 +114,19 @@ void Air780E_Init(void)
     uint8_t creg_ok;
     uint8_t attached_ok;
 
-    printf("[Air780E] init start (AT framework, USART1 PA9/PA10; UART not configured yet)\n");
-    printf("[Air780E] note: PWRKEY planned on PB0, but PB0 is currently LD1_GREEN\n");
+#if AIR780E_USE_HAL_UART
+    printf("[Air780E] init start (HAL UART, USART1 PA9/PA10)\n");
+#else
+    printf("[Air780E] init start (stub AT, set AIR780E_USE_HAL_UART=1 after CubeMX enables USART1)\n");
+#endif
+    printf("[Air780E] note: PB0 PWRKEY conflict is owned by C group per TROUBLESHOOTING.md\n");
 
     at_ok = Air780E_SendAT("AT", "OK", 1000U);
     echo_ok = Air780E_SendAT("ATE0", "OK", 1000U);
     (void)Air780E_SendAT("AT+CSQ", "OK", 1000U);
-    (void)Air780E_ParseSignalQuality("+CSQ: 25,99\r\nOK");
-    creg_ok = Air780E_SendAT("AT+CREG?", "+CREG: 0,1", 1000U);
+    (void)Air780E_ParseSignalQuality(at_response);
+    creg_ok = Air780E_SendAT("AT+CREG?", "+CREG:", 1000U);
+    creg_ok = ((creg_ok != 0U) && (Air780E_IsRegistered(at_response) != 0U)) ? 1U : 0U;
     attached_ok = Air780E_SendAT("AT+CGATT?", "+CGATT: 1", 1000U);
 
     network_ready = ((at_ok != 0U) && (echo_ok != 0U) && (creg_ok != 0U) && (attached_ok != 0U)) ? 1U : 0U;

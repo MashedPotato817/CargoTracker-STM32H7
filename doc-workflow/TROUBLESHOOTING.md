@@ -175,3 +175,49 @@ Size  : 0x00010000
 3. C 组负责统一修改 CubeMX 并协调 A/B 组
 
 > 注意：此变更必须由 C 组统一操作，A/B 组禁止单独使用 PB0。
+
+---
+
+### 11. Keil uvoptx 残留 RVDS port.c
+
+**现象**：`test1.uvprojx` 中已经引用 `GCC/ARM_CM7/r0p1/port.c`，但 Keil 命令行构建仍然额外编译：
+
+```text
+../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/port.c
+```
+
+并报 `__asm`、`PRESERVE8`、`uxCriticalNesting` 等 ARM Compiler 6 不兼容错误。
+
+**原因**：`test1/MDK-ARM/test1.uvoptx` 中残留了旧的 RVDS `port.c` 文件条目。Keil 可能继续把该用户选项文件里的旧条目带入构建，即使 `.uvprojx` 已经改正确。
+
+**解决**：
+
+1. 搜索 Keil 工程目录：
+
+```powershell
+rg -n "RVDS|ARM_CM4F|port.c" test1/MDK-ARM
+```
+
+2. 确认 `.uvprojx` 只保留：
+
+```text
+..\Middlewares\Third_Party\FreeRTOS\Source\portable\GCC\ARM_CM7\r0p1\port.c
+```
+
+3. 删除 `test1.uvoptx` 中指向 `portable/RVDS/ARM_CM4F/port.c` 的旧 `<File>...</File>` 块。
+4. 重新运行 Keil 命令行构建，确认只编译一个 `port.c`，结果为 0 Error / 0 Warning。
+
+---
+
+### 12. USART2 默认 115200 与 GPS 9600 不匹配
+
+**现象**：CubeMX 已生成 `huart2` / `MX_USART2_UART_Init()`，PD5/PD6 引脚也正确，但 `usart.c` 中 USART2 baud rate 仍是 115200。ATGM336H GPS 默认输出通常为 9600 baud，串口波特率不匹配会导致 NMEA 数据乱码或读取超时。
+
+**原因**：CubeMX 使能 USART2 时如果没有手动修改参数，会保留默认 115200。
+
+**解决**：
+
+1. 最佳做法：回到 CubeMX，将 USART2 Baud Rate 改为 `9600`，重新生成代码。
+2. 临时兼容：在 GPS 模块初始化中检测 `huart2.Init.BaudRate`，若不是 `9600`，调用 `HAL_UART_Init(&huart2)` 重新初始化为 9600。
+
+> 注意：最终提交前建议仍以 CubeMX 配置为准，避免后续重新生成代码后再次出现参数漂移。
