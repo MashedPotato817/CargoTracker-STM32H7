@@ -101,7 +101,7 @@ Size  : 0x00010000
 
 ## Git
 
-### 6. CubeMX 重新生成后文件冲突
+### 8. CubeMX 重新生成后文件冲突
 
 **现象**：CubeMX 重新生成后 `git diff` 一片红，分不清哪些是配置变更、哪些是覆盖。
 
@@ -111,3 +111,36 @@ Size  : 0x00010000
 1. 改 CubeMX 前先 `git commit`（干净状态）
 2. CubeMX 生成后再 `git diff` 一目了然
 3. 所有自定义代码必须写在 `USER CODE` 段内
+
+---
+
+### 9. FPU 未启用导致浮点运算性能差
+
+**现象**：SHT31 温度转换、GPS 坐标解析等浮点运算极慢。
+
+**原因**：`FreeRTOSConfig.h` 中 `configENABLE_FPU=0`，Cortex-M7 硬件 FPU 被禁用，所有 float 运算走软件模拟。
+
+**解决**：
+
+```c
+// FreeRTOSConfig.h
+#define configENABLE_FPU    1   // 启用硬件 FPU
+#define configENABLE_MPU    0   // 保持禁用（FreeRTOS MPU wrapper 未使用）
+```
+
+> 注意：CubeMX 可能不会自动打开此项，需手动修改 FreeRTOSConfig.h。
+
+---
+
+### 10. PB0 引脚冲突：LD1_GREEN vs Air780E PWRKEY
+
+**现象**：硬件到齐后发现 PB0 同时用于心跳灯（LD1_GREEN）和 Air780E 4G 模块电源控制（PWRKEY）。
+
+**原因**：stub 阶段 PB0 被配置为 LD1_GREEN 指示灯，但设计文档中 PB0 是 Air780E PWRKEY。
+
+**解决**：
+1. 心跳灯迁移到 PE1（LD2_YELLOW），通过不同闪烁模式区分心跳（慢闪）和报警（快闪）
+2. PB0 释放为 Air780E PWRKEY（GPIO_Output）
+3. C 组负责统一修改 CubeMX 并协调 A/B 组
+
+> 注意：此变更必须由 C 组统一操作，A/B 组禁止单独使用 PB0。

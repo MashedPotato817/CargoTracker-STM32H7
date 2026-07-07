@@ -12,7 +12,7 @@
 
 | 项目 | 规格 |
 |------|------|
-| **主控 MCU** | STM32H7A3ZI (Cortex-M7, 480MHz) |
+| **主控 MCU** | STM32H7A3ZI (Cortex-M7, 280MHz) |
 | **开发板** | NUCLEO-H7A3ZI-Q |
 | **开发环境** | Keil MDK + STM32CubeMX |
 
@@ -21,33 +21,37 @@
 | 模块 | 外设/协议 | 功能描述 |
 |------|-----------|---------|
 | GPS 定位 | UART | 经纬度实时采集 |
-| NFC 激活 | SPI（或 I2C） | 无源标签一键唤醒设备 |
+| NFC 激活 | I2C（PN532） | 无源标签一键唤醒设备 |
 | 温湿度监测 | I2C（SHT31） | 实时温湿度采集 + 阈值报警 |
 | 声光报警 | GPIO（LED/Buzzer） | 本地超限声光提示 |
 | 低功耗管理 | RTC / Stop 模式 | 默认深度睡眠，NFC 唤醒 |
-| 云平台通信 | UART → ESP8266(AT) / 4G → MQTT | 数据上报 + 指令接收 |
+| 云平台通信 | UART → Air780E 4G → MQTT | 数据上报 + 指令接收 |
 | 云端指令 | MQTT 消息解析 | 暂留 / 退货 / 继续运输 |
 
 ## 项目结构
 
 ```
 CargoTracker-STM32H7/
-├── .claude/                       # Claude Code 配置
-├── .git/                          # Git 仓库
-├── .gitignore                     # Git 忽略规则
-├── CLAUDE.md                      # 项目指引（供 Claude Code 使用）
+├── .claude/                       # Claude Code 配置（团队共享 settings.json）
+├── AGENTS.md                      # Codex 指引（指向 CLAUDE.md）
+├── CLAUDE.md                      # 项目权威指引（供 Claude Code/Codex 使用）
 ├── README.md                      # 本文件
-├── doc/                           # 文档目录
-│   ├── task.md                    # 三人分工方案、接口规范、开发顺序
+├── doc/                           # 设计文档
+│   ├── task.md                    # 三人分工方案、接口规范
 │   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录详细步骤
 │   ├── STM32H7_CubeMX_Config.md   # CubeMX 引脚/时钟/DMA 完整配置
 │   └── STM32H7_Logistics_System.md # 完整设计方案（BOM/接线/电源/状态机）
-└── test1/                         # STM32CubeMX 生成的工程（Keil MDK）
-    ├── Core/                      # 核心代码
-    │   ├── Inc/                   #   头文件
-    │   └── Src/                   #   源文件
-    ├── Drivers/                   # HAL 驱动 + CMSIS（不手动修改）
-    └── MDK-ARM/                   # Keil MDK 项目文件
+├── doc-workflow/                  # 开发工作流
+│   ├── task2.md                   #   当前任务：硬件集成
+│   ├── GIT_WORKFLOW.md            #   Git 协作规范
+│   ├── TROUBLESHOOTING.md         #   踩坑记录
+│   ├── hardware_map.md            #   硬件-代码映射表
+│   └── archive/                   #   历史日志归档
+├── user-manual-md/                # 参考手册（Markdown）
+└── test1/                         # Keil MDK 工程
+    ├── Core/                      # 核心源码
+    ├── Drivers/                   # HAL + CMSIS（CubeMX 生成，不入库）
+    └── MDK-ARM/                   # Keil 项目文件
 ```
 
 ## 快速开始
@@ -101,34 +105,24 @@ while (1)
 
 ## 当前开发阶段
 
-详见 [`doc-workflow/task1.md`](doc-workflow/task1.md) — FreeRTOS 工程骨架 + 状态机框架 + 驱动 stub（无需外设即可开始）。
+**硬件集成阶段**。所有外设模块（SHT31、PN532、ATGM336H、Air780E、W25Q128）已到齐。驱动采用条件编译双模式（`*_USE_HAL_*` 宏），可独立切换 stub/真实模式。
+
+详见 [`doc-workflow/task2.md`](doc-workflow/task2.md) — 硬件集成任务计划。
 
 > ⚠️ 遇到问题先查 [`doc-workflow/TROUBLESHOOTING.md`](doc-workflow/TROUBLESHOOTING.md)（团队踩坑记录），解决后往里面补充。
 
 ### FreeRTOS 任务架构（6 Task + 3 Queue）
 
-| Task | 优先级 | 职责 |
-|------|--------|------|
-| Task_StateMachine | 高 | 状态机调度 + 低功耗 + 云指令分发 |
-| Task_4G_MQTT | 高 | USART1 AT指令 + MQTT 收发 |
-| Task_I2C_Sensors | 中 | SHT31 + PN532（共享 I2C1） |
-| Task_GPS | 中 | USART2 + NMEA 解析 |
-| Task_Flash | 低 | W25Q128 读写缓存 |
-| Task_Alarm | 低 | LED + 蜂鸣器 |
+| Task | 负责人 | 优先级 | 职责 |
+|------|--------|--------|------|
+| Task_StateMachine | C | 高 | 状态机调度 + 低功耗 + 云指令分发 |
+| Task_4G_MQTT | B | 高 | USART1 AT指令 + MQTT 收发 |
+| Task_I2C_Sensors | A | 中 | SHT31 + PN532（共享 I2C1） |
+| Task_GPS | B | 中 | USART2 + NMEA 解析 |
+| Task_Flash | A | 低 | W25Q128 读写缓存 |
+| Task_Alarm | C | 低 | LED + 蜂鸣器 |
 
-## 学习路线
-
-按顺序掌握以下外设驱动，逐步完成系统：
-
-1. LED 点灯 — GPIO 输出
-2. 按键中断 — EXTI
-3. USART 串口 — 调试输出
-4. FreeRTOS — 多任务调度 + 队列通信
-5. 定时器 — TIM
-6. I2C — SHT31 温湿度传感器
-7. SPI — NFC 模块
-8. UART — GPS 模块
-9. MQTT — 云平台通信
+**3 条队列：** `queue_activation`（NFC/按钮→状态机）、`queue_sensor_data`（GPS/温湿度→状态机）、`queue_cloud_cmd`（MQTT→状态机）
 
 ## 开发注意事项
 

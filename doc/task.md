@@ -158,7 +158,7 @@ Project
 
 ## 三个人如何联调？
 
-建议使用 Git，每个人负责自己的模块，最后统一集成。
+建议使用 Git，每个人负责自己的模块，最后统一集成。详见 [`doc-workflow/GIT_WORKFLOW.md`](../doc-workflow/GIT_WORKFLOW.md) — 分支策略、PR 流程、CubeMX 冲突管理。
 
 调用流程：
 
