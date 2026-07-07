@@ -6,7 +6,7 @@
  * and generates Core/Inc/i2c.h with hi2c1.
  */
 #ifndef SHT31_USE_HAL_I2C
-#define SHT31_USE_HAL_I2C 0
+#define SHT31_USE_HAL_I2C 1
 #endif
 
 void SHT31_Init(void);

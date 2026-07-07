@@ -96,8 +96,6 @@ void App_TaskStateMachine(void)
     Power_Init();
 
     for (;;) {
-        HAL_GPIO_TogglePin(LD1_GREEN_GPIO_Port, LD1_GREEN_Pin);
-
         if (osMessageQueueGet(queue_activationHandle, &activation_event, NULL, 1000) != osOK) {
             continue;
         }
@@ -135,6 +133,7 @@ void App_TaskStateMachine(void)
         }
 
         StateMachine_Set(STATE_UPLOAD);
+        Power_Air780E_SetPwrKey(1);
         HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
         if (MQTT_PublishTelemetry(&telemetry) == 0U) {
             (void)W25Q128_WriteTelemetry(&telemetry);
@@ -151,6 +150,7 @@ void App_TaskStateMachine(void)
         }
 
         StateMachine_Set(STATE_RETURN_SLEEP);
+        Power_Air780E_SetPwrKey(0);
         Power_EnterStopStub();
         StateMachine_Set(STATE_SLEEP);
     }
@@ -242,6 +242,6 @@ void App_TaskAlarm(void)
 {
     for (;;) {
         Alarm_Task();
-        osDelay(500);
+        osDelay(100);
     }
 }

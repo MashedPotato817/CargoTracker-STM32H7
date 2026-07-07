@@ -10,14 +10,17 @@
 
 #define W25Q128_CMD_WRITE_ENABLE 0x06U
 #define W25Q128_CMD_READ_STATUS  0x05U
+#define W25Q128_CMD_SECTOR_ERASE 0x20U
 #define W25Q128_CMD_PAGE_PROGRAM 0x02U
 #define W25Q128_CMD_READ_DATA    0x03U
 #define W25Q128_CMD_JEDEC_ID     0x9FU
 #define W25Q128_STATUS_BUSY      0x01U
 #define W25Q128_TIMEOUT_MS       100U
+#define W25Q128_ERASE_TIMEOUT_MS 4000U
 #define W25Q128_TELEM_BASE_ADDR  0x000000U
 #define W25Q128_TELEM_SLOT_SIZE  32U
 #define W25Q128_TELEM_SLOTS      128U
+#define W25Q128_SECTOR_SIZE      4096U
 
 static uint32_t write_slot = 0U;
 
@@ -35,12 +38,12 @@ typedef struct {
 #if W25Q128_USE_HAL_SPI
 static void w25q128_select(void)
 {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(W25Q128_CS_GPIO_Port, W25Q128_CS_Pin, GPIO_PIN_RESET);
 }
 
 static void w25q128_deselect(void)
 {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(W25Q128_CS_GPIO_Port, W25Q128_CS_Pin, GPIO_PIN_SET);
 }
 
 static uint8_t w25q128_tx(const uint8_t *data, uint16_t len)
@@ -69,13 +72,13 @@ static uint8_t w25q128_write_enable(void)
     return 1U;
 }
 
-static uint8_t w25q128_wait_ready(void)
+static uint8_t w25q128_wait_ready(uint32_t timeout_ms)
 {
     uint8_t cmd = W25Q128_CMD_READ_STATUS;
     uint8_t status = W25Q128_STATUS_BUSY;
     uint32_t start = HAL_GetTick();
 
-    while ((HAL_GetTick() - start) < W25Q128_TIMEOUT_MS) {
+    while ((HAL_GetTick() - start) < timeout_ms) {
         w25q128_select();
         if ((w25q128_tx(&cmd, 1U) == 0U) || (w25q128_rx(&status, 1U) == 0U)) {
             w25q128_deselect();
@@ -89,6 +92,52 @@ static uint8_t w25q128_wait_ready(void)
     }
 
     return 0U;
+}
+
+static uint8_t w25q128_sector_erase(uint32_t addr)
+{
+    uint8_t cmd[4];
+
+    if (w25q128_write_enable() == 0U) {
+        return 0U;
+    }
+
+    cmd[0] = W25Q128_CMD_SECTOR_ERASE;
+    cmd[1] = (uint8_t)(addr >> 16U);
+    cmd[2] = (uint8_t)(addr >> 8U);
+    cmd[3] = (uint8_t)addr;
+
+    w25q128_select();
+    if (w25q128_tx(cmd, sizeof(cmd)) == 0U) {
+        w25q128_deselect();
+        return 0U;
+    }
+    w25q128_deselect();
+
+    return w25q128_wait_ready(W25Q128_ERASE_TIMEOUT_MS);
+}
+
+static uint8_t w25q128_read_data(uint32_t addr, uint8_t *data, uint16_t len)
+{
+    uint8_t cmd[4];
+
+    if ((data == NULL) || (len == 0U)) {
+        return 0U;
+    }
+
+    cmd[0] = W25Q128_CMD_READ_DATA;
+    cmd[1] = (uint8_t)(addr >> 16U);
+    cmd[2] = (uint8_t)(addr >> 8U);
+    cmd[3] = (uint8_t)addr;
+
+    w25q128_select();
+    if ((w25q128_tx(cmd, sizeof(cmd)) == 0U) || (w25q128_rx(data, len) == 0U)) {
+        w25q128_deselect();
+        return 0U;
+    }
+    w25q128_deselect();
+
+    return 1U;
 }
 
 static uint8_t w25q128_page_program(uint32_t addr, const uint8_t *data,
@@ -116,7 +165,7 @@ static uint8_t w25q128_page_program(uint32_t addr, const uint8_t *data,
     }
     w25q128_deselect();
 
-    return w25q128_wait_ready();
+    return w25q128_wait_ready(W25Q128_TIMEOUT_MS);
 }
 #endif
 
@@ -161,9 +210,24 @@ uint8_t W25Q128_WriteTelemetry(const TelemetryData *telemetry)
     write_slot = (write_slot + 1U) % W25Q128_TELEM_SLOTS;
 
 #if W25Q128_USE_HAL_SPI
+    uint8_t verify[sizeof(W25Q128TelemetryRecord)] = {0};
+
+    if ((addr % W25Q128_SECTOR_SIZE) == 0U) {
+        if (w25q128_sector_erase(addr) == 0U) {
+            printf("[W25Q128] erase failed at 0x%06X\n", (unsigned int)addr);
+            return 0U;
+        }
+    }
+
     if (w25q128_page_program(addr, (const uint8_t *)&record,
                              (uint16_t)sizeof(record)) == 0U) {
         printf("[W25Q128] cache telemetry failed at 0x%06X\n", (unsigned int)addr);
+        return 0U;
+    }
+
+    if ((w25q128_read_data(addr, verify, (uint16_t)sizeof(verify)) == 0U) ||
+        (memcmp(verify, &record, sizeof(record)) != 0)) {
+        printf("[W25Q128] verify failed at 0x%06X\n", (unsigned int)addr);
         return 0U;
     }
 

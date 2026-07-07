@@ -9,7 +9,7 @@
  * and configures PA4 as a GPIO output chip-select pin.
  */
 #ifndef W25Q128_USE_HAL_SPI
-#define W25Q128_USE_HAL_SPI 0
+#define W25Q128_USE_HAL_SPI 1
 #endif
 
 void W25Q128_Init(void);
