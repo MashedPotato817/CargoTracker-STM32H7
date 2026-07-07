@@ -5,13 +5,14 @@
 ## 分支策略
 
 ```
-main                       ← 始终可编译可烧录，保护分支
-  ├── feat/i2c-driver      ← A: I2C1 + SHT31/PN532 真驱动
-  ├── feat/spi-driver      ← A: SPI1 + W25Q128 真驱动
-  ├── feat/gps-driver      ← B: USART2 + GPS 真驱动
-  ├── feat/4g-driver       ← B: USART1 + Air780E 真驱动
-  ├── feat/pb0-fix         ← C: PB0 冲突解决
+main                       ← 始终可编译可烧录，保护分支（W 已合并：I2C/SPI/USART HAL）
+  ├── feat/pb0-fix         ← C: PB0 冲突解决（当前阻塞项）
   ├── feat/integration     ← C: 系统集成 + 状态机
+  ├── feat/sht31-verify    ← 待接线验证
+  ├── feat/pn532-verify    ← 待接线验证
+  ├── feat/gps-verify      ← 待接线验证
+  ├── feat/flash-verify    ← 待接线验证
+  ├── feat/air780e-verify  ← 待接线验证
   └── fix/*                ← Bug 修复
 ```
 

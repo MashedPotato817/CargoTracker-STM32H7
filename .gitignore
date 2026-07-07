@@ -46,7 +46,6 @@ test/
 user-manual-pdf/
 doc-workflow/error1.md
 doc-workflow/PortReceive.md
-doc-workflow/current_status.md
 test1/Core/Inc/stm32h7xx_nucleo_conf.h
 
 # ========== 通用 ==========

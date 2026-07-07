@@ -6,8 +6,8 @@
 
 - [x] Task 1 完成（FreeRTOS 骨架 + 状态机 + stub 驱动）
 - [x] 外设硬件到齐（SHT31、PN532、ATGM336H GPS、Air780E 4G、W25Q128 Flash）
-- [ ] `.gitignore` 已优化（Drivers/Middlewares 不入库）
-- [ ] 团队已同步最新 main 分支
+- [x] `.gitignore` 已优化（Drivers/Middlewares 不入库）
+- [x] 团队已同步最新 main 分支（W 分支已合并）
 
 ## 关键规则
 
@@ -18,20 +18,18 @@
 
 ---
 
-## Task 2.1: CubeMX 外设使能
+## Task 2.1: CubeMX 外设使能 ✅ 代码完成，⚠️ 待硬件验证
 
-**负责人：A** | 预计：~2 小时
+**负责人：A** | 状态：代码已完成（W 分支合并）
 
-按顺序在 `test1/test1.ioc` 中使能外设：
-
-| 步骤 | 外设 | 配置 | 验证 |
+| 步骤 | 外设 | 配置 | 状态 |
 |------|------|------|------|
-| 2.1.1 | I2C1 | PB8 SCL, PB9 SDA, 400kHz | 编译 0 Error |
-| 2.1.2 | SPI1 | PA5 SCK, PA6 MISO, PA7 MOSI; PA4 GPIO_Output (CS) | 编译 0 Error |
-| 2.1.3 | USART2 | PD5 TX, PD6 RX, 9600 baud, 8N1 | 编译 0 Error |
-| 2.1.4 | USART1 | PA9 TX, PA10 RX, 115200 baud, DMA RX Circular | 编译 0 Error |
-| 2.1.5 | PC8, PC9 | GPIO_Output (Buzzer, Alarm LED) | 编译 0 Error |
-| 2.1.6 | FPU | FreeRTOSConfig.h: `configENABLE_FPU=1` | 编译 0 Error |
+| 2.1.1 | I2C1 | PB8 SCL, PB9 SDA, 400kHz | ✅ `MX_I2C1_Init()` 已生成 |
+| 2.1.2 | SPI1 | PA5 SCK, PA6 MISO, PA7 MOSI; PA4 GPIO_Output (CS) | ✅ `MX_SPI1_Init()` 已生成 |
+| 2.1.3 | USART2 | PD5 TX, PD6 RX, 115200 baud, GPS_Init 重配 9600 | ⚠️ 建议 CubeMX 改 9600 |
+| 2.1.4 | USART1 | PA9 TX, PA10 RX, 115200 baud | ✅ `MX_USART1_UART_Init()` 已生成 |
+| 2.1.5 | PC8, PC9 | GPIO_Output (Buzzer, Alarm LED) | ✅ `MX_GPIO_Init()` 已配置 |
+| 2.1.6 | FPU | FreeRTOSConfig.h: `configENABLE_FPU=1` | ✅ 已生效 |
 
 **操作流程**：
 ```
@@ -47,101 +45,84 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ## Task 2.2: I2C1 驱动验证（SHT31 + PN532）
 
-**负责人：A** | 依赖：Task 2.1 | 预计：~4 小时
+**负责人：A** | 代码：✅ 完成 | 硬件验证：❌ 待做
 
 ### 2.2.1 SHT31 温湿度
 
-```
-1. 连接 SHT31 到 I2C1 总线（PB8 SCL, PB9 SDA）
-2. sht31.h: #define SHT31_USE_HAL_I2C  1
-3. 编译 → 烧录 → 串口观察输出
-4. 验证：温度读数应在室温范围（~20-30°C），湿度合理（~40-70%）
-5. 握手验证：手指靠近传感器，温度应上升
-```
+- [x] `SHT31_USE_HAL_I2C = 1`（已配置）
+- [ ] 连接 SHT31 到 I2C1 总线（PB8 SCL, PB9 SDA）
+- [ ] 编译 → 烧录 → 串口观察温度读数（应在 ~20-30°C）
+- [ ] 握手验证：手指靠近传感器，温度上升
 
 ### 2.2.2 PN532 NFC
 
-```
-1. 确认 PN532 已挂在 I2C1 总线（地址 0x24，与 SHT31 0x44 不冲突）
-2. pn532.h: #define PN532_USE_HAL_I2C  1
-3. 编译 → 烧录 → 靠近 NTAG215 标签
-4. 验证：串口输出真实 UID（非 MOCK-UID-001）
-```
+- [x] `PN532_USE_HAL_I2C = 1`（已配置）
+- [ ] 确认 PN532 已挂在 I2C1 总线（地址 0x24，与 SHT31 0x44 不冲突）
+- [ ] 编译 → 烧录 → 靠近 NTAG215 标签
+- [ ] 验证：串口输出真实 UID（非 MOCK-UID-001）
 
 ### 2.2.3 I2C 总线共享验证
 
-```
-1. 交替读取 SHT31 和 PN532，确认无 I2C 总线冲突
-2. 长时间运行（10分钟+），无 I2C 超时或 HAL_ERROR
-```
+- [ ] 交替读取 SHT31 和 PN532，确认无 I2C 总线冲突
+- [ ] 长时间运行（10分钟+），无 I2C 超时或 HAL_ERROR
 
 ---
 
 ## Task 2.3: USART2 驱动验证（GPS）
 
-**负责人：B** | 依赖：Task 2.1 | 预计：~3 小时
+**负责人：B** | 代码：✅ 完成 | 硬件验证：❌ 待做
 
-```
-1. 连接 ATGM336H GPS 到 USART2（PD5 TX, PD6 RX）
-2. 修改 gps.c：从 USART2 接收缓冲区读取 NMEA 数据
-   （替换当前硬编码的 stub NMEA 句子）
-3. 编译 → 烧录 → 户外或窗边测试
-4. 验证：串口输出真实经纬度（非 31.2304/121.4737）
-5. 检查：RMC/GGA 解析正确处理有效/无效定位
-```
+- [x] `GPS_USE_HAL_UART = 1`（已配置）
+- [x] USART2 HAL 真 UART 逐字节 NMEA 读取（已实现）
+- [x] `GPS_Init()` 运行时自动重配 USART2 至 9600 baud
+- [ ] 连接 ATGM336H GPS 到 USART2（PD5 TX, PD6 RX）
+- [ ] 编译 → 烧录 → 户外或窗边测试
+- [ ] 验证：串口输出真实经纬度（非 31.2304/121.4737）
+- [ ] 检查：RMC/GGA 解析正确处理有效/无效定位
 
 ---
 
 ## Task 2.4: SPI1 驱动验证（W25Q128 Flash）
 
-**负责人：A** | 依赖：Task 2.1 | 预计：~3 小时
+**负责人：A** | 代码：✅ 完成 | 硬件验证：❌ 待做
 
-```
-1. 连接 W25Q128 到 SPI1 引脚（PA4 CS, PA5 SCK, PA6 MISO, PA7 MOSI）
-2. w25q128.h: #define W25Q128_USE_HAL_SPI  1
-3. 编译 → 烧录
-4. 验证 JEDEC ID：应读取 0xEF17（W25Q128 制造商ID+设备ID）
-5. 验证读写：写入测试数据 → 读回 → 比对
-6. 验证擦除：Sector Erase → 读回全 0xFF
-```
+- [x] `W25Q128_USE_HAL_SPI = 1`（已配置）
+- [x] 扇区擦除 + 读数据 + 写后校验（已实现）
+- [ ] 连接 W25Q128 到 SPI1 引脚（PA4 CS, PA5 SCK, PA6 MISO, PA7 MOSI）
+- [ ] 编译 → 烧录
+- [ ] 验证 JEDEC ID：应读取 0xEF17（W25Q128 制造商ID+设备ID）
+- [ ] 验证读写：写入测试数据 → 读回 → 比对
+- [ ] 验证擦除：Sector Erase → 读回全 0xFF
 
 ---
 
 ## Task 2.5: USART1 驱动验证（Air780E 4G + MQTT）
 
-**负责人：B** | **⚠️ 依赖 Task 2.6（PB0 解决）** | 预计：~5 小时
+**负责人：B** | 代码：✅ 完成 | ⛔ 阻塞：Task 2.6（PB0 PWRKEY 未解决）
 
-```
-前置：PB0 已释放为 Air780E PWRKEY
-
-1. 连接 Air780E 到 USART1（PA9 TX, PA10 RX）、独立 4.0V 供电
-2. 修改 air780e.c：
-   - Air780E_SendAT() 改为通过 USART1 发送、等待响应
-   - 替换 stub AT 响应为真实响应解析
-3. AT 指令序列验证：AT → ATE0 → AT+CSQ → AT+CREG? → AT+CGATT?
-4. MQTT 验证（需 SIM 卡 + 云平台配置）：
-   - AT+CMQTTSTART → 连接 broker
-   - AT+CMQTTPUB → 发布 telemetry JSON
-5. 验证：串口输出真实 CSQ 值、网络注册状态、MQTT 发布结果
-```
+- [x] `AIR780E_USE_HAL_UART = 1`（已配置）
+- [x] HAL UART 真 AT 命令发送/接收/超时（已实现）
+- [x] `AT+CREG?` 同时接受 0,1（本地）和 0,5（漫游）注册
+- [x] MQTT 真 UART 路径（已实现）
+- [ ] **前置**：PB0 释放为 Air780E PWRKEY（Task 2.6）
+- [ ] 连接 Air780E 到 USART1（PA9 TX, PA10 RX）、独立 4.0V 供电
+- [ ] AT 指令序列验证：AT → ATE0 → AT+CSQ → AT+CREG? → AT+CGATT?
+- [ ] MQTT 验证（需 SIM 卡 + 云平台配置）
+- [ ] 验证：串口输出真实 CSQ 值、网络注册状态、MQTT 发布结果
 
 ---
 
-## Task 2.6: PB0 冲突解决
+## Task 2.6: PB0 冲突解决 ❌ 未开始
 
-**负责人：C** | 依赖：Task 2.1 | 预计：~2 小时
+**负责人：C** | 状态：最高优先级阻塞项
 
-```
-1. CubeMX 修改：
-   - PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
-   - 系统心跳迁移到 PE1（LD2_YELLOW）
-2. 代码修改（alarm.c / app.c）：
-   - PE1 心跳慢闪（1s周期）= 系统正常
-   - PE1 快闪（200ms周期）= 报警状态
-   - 新增 Air780E_PWRKEY_ON/OFF 控制函数
-3. 编译 → 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
-4. 通知 B 组 PB0 已可用
-```
+- [ ] CubeMX：PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
+- [ ] CubeMX：系统心跳迁移到 PE1（LD2_YELLOW）
+- [ ] alarm.c：PE1 心跳慢闪（1s周期）= 系统正常，快闪（200ms周期）= 报警
+- [ ] power.c：`AIR780E_PWRKEY_GPIO_Port/Pin` 宏已定义
+- [ ] power.c：`Power_Air780E_SetPwrKey()` 控制函数
+- [ ] 编译 → 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
+- [ ] 通知 B 组 PB0 已可用 → 解除 2.5 阻塞
 
 ---
 
