@@ -25,18 +25,23 @@ main                       ← 始终可编译可烧录，保护分支
 
 ## 首次设置（新成员 / 刚 clone）
 
-> ⚠️ `Drivers/` 和 `Middlewares/` 不在 Git 中（已 gitignore）。
+> ⚠️ 以下文件/目录不在 Git 中（已 gitignore，由 CubeMX Generate Code 生成）：
+> - `test1/Drivers/` — HAL + CMSIS 库
+> - `test1/Middlewares/` — FreeRTOS 源码
+> - `test1/test1.ioc` — CubeMX 工程文件
+> - `test1/Core/Src/system_stm32h7xx.c` — 系统初始化
+> - `test1/MDK-ARM/test1.uvprojx` — Keil 工程文件
 
 ```bash
 # 1. 安装 STM32CubeMX 6.17.0 + FW_H7 V1.13.0
 # 2. clone 仓库
 git clone <repo-url>
 cd CargoTracker-STM32H7
-# 3. 打开 test1/test1.ioc → Generate Code（生成 Drivers/ 和 Middlewares/）
+# 3. 打开 test1/test1.ioc → Generate Code（一步生成以上所有文件）
 # 4. Keil 打开 test1/MDK-ARM/test1.uvprojx → F7 编译
 ```
 
-> 现有成员首次 pull 本次变更后，本地 `Drivers/` 和 `Middlewares/` 会被删除。**重新 CubeMX Generate Code 一次即可恢复。**
+> 现有成员首次 pull 本次变更后，以上文件/目录会被删除。**重新 CubeMX Generate Code 一次即可全部恢复。**
 
 ## 每日工作流
 
