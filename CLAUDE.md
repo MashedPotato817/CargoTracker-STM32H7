@@ -113,12 +113,24 @@ test1/Core/
 └── Middlewares/    FreeRTOS (CMSIS_V2)
 ```
 
+## 首次设置（clone 后必做！）
+
+> ⚠️ `Drivers/`、`Middlewares/`、`test1.ioc`、`system_stm32h7xx.c`、`test1.uvprojx` **不在 Git 中**（`.gitignore` 已排除），clone 后无法直接编译。
+
+**操作步骤：**
+1. 用 **STM32CubeMX 6.17.0** 打开 `test1/test1.ioc`
+2. 菜单 → **Generate Code**（固件包：STM32Cube FW_H7 V1.13.0）
+3. 生成后所有缺失文件和目录出现在本地
+4. Keil 打开 `test1/MDK-ARM/test1.uvprojx` → F7 编译
+
+> 版本不一致会导致生成的 HAL 代码不同。团队统一使用 CubeMX 6.17.0 + FW_H7 V1.13.0。
+
 ## 开发操作
 
 | 操作 | 方式 |
 |------|------|
-| 打开工程 | 双击 `test1/MDK-ARM/test1.uvprojx` |
-| 编译 | Keil F7 (Build) |
+| 初次编译 | 上面「首次设置」做完 → Keil F7 |
+| 日常编译 | Keil F7 (Build) |
 | 下载烧录 | Keil Ctrl+F8 (Download) |
 | 修改外设 | CubeMX 打开 `test1/test1.ioc` → 重新生成代码 |
 | 添加模块 | `test1/Core/Src/` 下新建 `.c`，`Inc/` 下新建 `.h` |
@@ -149,7 +161,7 @@ Size  : 0x00010000
 
 1. **不手动修改** `Drivers/` 下 CMSIS 和 HAL 驱动 — 通过 CubeMX 版本管理
 2. **CubeMX 重新生成**：`USER CODE BEGIN/END` 段内代码保留，段外**被覆盖**
-3. **编译产物** (`.o`, `.axf`, `.hex`, `.map`) **不纳入版本控制**
+3. **CubeMX 生成文件不纳入版本控制**：`Drivers/`、`Middlewares/`、`.ioc`、`system_stm32h7xx.c`、`.uvprojx` 均由 CubeMX Generate Code 恢复
 4. **4G模块独立供电** (4.0V)，不可与传感器共用 3.3V
 5. **I2C 共享总线**：SHT31 + PN532 + OLED 共用 PB8/PB9
 6. **低功耗**：默认 Stop Mode，NFC 唤醒；4G 模块空闲时关断 PWRKEY

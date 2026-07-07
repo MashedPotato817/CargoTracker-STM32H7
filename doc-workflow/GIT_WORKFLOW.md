@@ -23,6 +23,26 @@ main                       ← 始终可编译可烧录，保护分支
 4. **合并后删除 feature 分支**，保持仓库整洁
 5. **分支命名**：`feat/<模块>` 功能、`fix/<问题>` 修复、`cube/<操作>` CubeMX
 
+## 首次设置（新成员 / 刚 clone）
+
+> ⚠️ 以下文件/目录不在 Git 中（已 gitignore，由 CubeMX Generate Code 生成）：
+> - `test1/Drivers/` — HAL + CMSIS 库
+> - `test1/Middlewares/` — FreeRTOS 源码
+> - `test1/test1.ioc` — CubeMX 工程文件
+> - `test1/Core/Src/system_stm32h7xx.c` — 系统初始化
+> - `test1/MDK-ARM/test1.uvprojx` — Keil 工程文件
+
+```bash
+# 1. 安装 STM32CubeMX 6.17.0 + FW_H7 V1.13.0
+# 2. clone 仓库
+git clone <repo-url>
+cd CargoTracker-STM32H7
+# 3. 打开 test1/test1.ioc → Generate Code（一步生成以上所有文件）
+# 4. Keil 打开 test1/MDK-ARM/test1.uvprojx → F7 编译
+```
+
+> 现有成员首次 pull 本次变更后，以上文件/目录会被删除。**重新 CubeMX Generate Code 一次即可全部恢复。**
+
 ## 每日工作流
 
 ### 工作前
@@ -108,6 +128,13 @@ CRC8 校验通过，温度读数验证正常（~26°C）。
 - ❌ 直接 push 到 main
 - ❌ 不 rebase 就提 PR（冲突留给 reviewer）
 - ❌ 手动修改 `Drivers/` 目录文件
+- ❌ **提交 `Drivers/` 或 `Middlewares/` 下任何文件**（已被 gitignore，`git add -f` 也不行）
 - ❌ 同时修改 `.ioc` 不沟通
 - ❌ PR 合并后不删 feature 分支
 - ❌ 提交编译产物（.o, .axf, .hex, .map）
+
+### 如何防止误提交 Drivers/Middlewares
+
+1. `.gitignore` 已排除这两个目录，正常 `git add` 不会包含
+2. 如 IDE 自动 stage 了这些文件，**不要 commit**，检查 `.gitignore` 是否最新
+3. Review 时特别注意 PR 中是否有 `test1/Drivers/` 或 `test1/Middlewares/` 路径的文件
