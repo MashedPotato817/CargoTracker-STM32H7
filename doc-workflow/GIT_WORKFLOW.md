@@ -23,6 +23,21 @@ main                       ← 始终可编译可烧录，保护分支
 4. **合并后删除 feature 分支**，保持仓库整洁
 5. **分支命名**：`feat/<模块>` 功能、`fix/<问题>` 修复、`cube/<操作>` CubeMX
 
+## 首次设置（新成员 / 刚 clone）
+
+> ⚠️ `Drivers/` 和 `Middlewares/` 不在 Git 中（已 gitignore）。
+
+```bash
+# 1. 安装 STM32CubeMX 6.17.0 + FW_H7 V1.13.0
+# 2. clone 仓库
+git clone <repo-url>
+cd CargoTracker-STM32H7
+# 3. 打开 test1/test1.ioc → Generate Code（生成 Drivers/ 和 Middlewares/）
+# 4. Keil 打开 test1/MDK-ARM/test1.uvprojx → F7 编译
+```
+
+> 现有成员首次 pull 本次变更后，本地 `Drivers/` 和 `Middlewares/` 会被删除。**重新 CubeMX Generate Code 一次即可恢复。**
+
 ## 每日工作流
 
 ### 工作前

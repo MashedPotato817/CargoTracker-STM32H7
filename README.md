@@ -58,10 +58,17 @@ CargoTracker-STM32H7/
 
 ### 环境准备
 
-1. **Keil MDK**（建议 V5.39 或以上）
-2. **STM32CubeMX**（修改外设配置时使用）
-3. **STM32H7 Device Family Pack**（DFP）
-4. **ST-Link 驱动**
+1. **Keil MDK**（V5.39+）+ **STM32H7 DFP**
+2. **STM32CubeMX 6.17.0** + **STM32Cube FW_H7 V1.13.0**（⚠️ 版本必须一致！）
+3. **ST-Link 驱动**
+
+### 首次克隆后设置
+
+> `Drivers/` 和 `Middlewares/` 不在仓库中。必须用 CubeMX 生成一次：
+
+1. CubeMX 打开 `test1/test1.ioc`
+2. 菜单 → **Generate Code**
+3. 等待生成完毕 → `Drivers/` 和 `Middlewares/` 出现在本地
 
 ### 打开工程
 
