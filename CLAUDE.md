@@ -113,24 +113,12 @@ test1/Core/
 └── Middlewares/    FreeRTOS (CMSIS_V2)
 ```
 
-## 首次设置（clone 后必做！）
-
-> ⚠️ `Drivers/` 和 `Middlewares/` **不在 Git 中**（`.gitignore` 已排除），clone 后无法直接编译。
-
-**操作步骤：**
-1. 用 **STM32CubeMX 6.17.0** 打开 `test1/test1.ioc`
-2. 菜单 → **Generate Code**（固件包：STM32Cube FW_H7 V1.13.0）
-3. 生成后 `Drivers/` 和 `Middlewares/` 出现在本地
-4. Keil 打开 `test1/MDK-ARM/test1.uvprojx` → F7 编译
-
-> 版本不一致会导致生成的 HAL 代码不同。团队统一使用 CubeMX 6.17.0 + FW_H7 V1.13.0。
-
 ## 开发操作
 
 | 操作 | 方式 |
 |------|------|
-| 初次编译 | 上面「首次设置」做完 → Keil F7 |
-| 日常编译 | Keil F7 (Build) |
+| 打开工程 | 双击 `test1/MDK-ARM/test1.uvprojx` |
+| 编译 | Keil F7 (Build) |
 | 下载烧录 | Keil Ctrl+F8 (Download) |
 | 修改外设 | CubeMX 打开 `test1/test1.ioc` → 重新生成代码 |
 | 添加模块 | `test1/Core/Src/` 下新建 `.c`，`Inc/` 下新建 `.h` |
