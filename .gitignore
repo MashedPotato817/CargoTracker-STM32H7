@@ -30,6 +30,9 @@ RTE/
 
 # ========== STM32CubeMX ==========
 *.mxproject
+test1/test1.ioc
+test1/Core/Src/system_stm32h7xx.c
+test1/MDK-ARM/test1.uvprojx
 
 # ========== HAL / CMSIS / FreeRTOS 库（CubeMX 生成，不入库）==========
 test1/Drivers/
