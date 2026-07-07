@@ -24,6 +24,37 @@
 
 ---
 
+### 3. CubeMX 重新生成后必查清单
+
+每次 CubeMX **GENERATE CODE** 之后，Keil 编译前检查以下 4 项（CubeMX 可能还原或改错）：
+
+**① system_stm32h7xx.c 路径**
+
+CubeMX 可能把该文件放在 `Drivers/CMSIS/.../Templates/` 下，但 uvprojx 引用的是 `Core/Src/`。编译报 `no such file or directory` 时，在 uvprojx 中把 FilePath 改为实际路径：
+```
+../Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/system_stm32h7xx.c
+```
+
+**② FreeRTOS Include Path**
+
+CubeMX 会还原为默认的 `RVDS/ARM_CM4F`。确认 Include Path 是：
+```
+../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1
+```
+
+**③ Flash 烧录算法**
+
+CubeMX 可能改 `<Flash2>` 为 `UL2CM3.DLL`（Cortex-M3 用）。确认是：
+```xml
+<Flash2>BIN\UL2V8M.DLL</Flash2>
+```
+
+**④ MicroLIB**
+
+确认 Options for Target → Target → **Use MicroLIB** 已勾选（printf 依赖）。
+
+---
+
 ## Keil MDK
 
 ### 3. Cannot Load Flash Programming Algorithm
