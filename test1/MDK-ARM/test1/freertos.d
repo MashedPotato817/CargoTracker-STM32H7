@@ -1,7 +1,7 @@
 test1/freertos.o: ..\Core\Src\freertos.c \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stddef.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stdint.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stddef.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stdint.h \
   ..\Core\Inc\FreeRTOSConfig.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h \
@@ -17,14 +17,14 @@ test1/freertos.o: ..\Core\Src\freertos.c \
   ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\stm32h7xx.h \
   ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\stm32h7a3xxq.h \
   ..\Drivers\CMSIS\Include\core_cm7.h \
-  C:\Users\20755\Desktop\embeded\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_version.h \
-  C:\Users\20755\Desktop\embeded\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_compiler.h \
-  C:\Users\20755\Desktop\embeded\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_armclang.h \
-  C:\Users\20755\Desktop\embeded\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\mpu_armv7.h \
-  C:\Users\20755\Desktop\embeded\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cachel1_armv7.h \
+  E:\Claude\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_version.h \
+  E:\Claude\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_compiler.h \
+  E:\Claude\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cmsis_armclang.h \
+  E:\Claude\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\mpu_armv7.h \
+  E:\Claude\CargoTracker-STM32H7\test1\Drivers\CMSIS\Include\cachel1_armv7.h \
   ..\Drivers\CMSIS\Device\ST\STM32H7xx\Include\system_stm32h7xx.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\Legacy\stm32_hal_legacy.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\math.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\math.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_rcc_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_gpio_ex.h \
@@ -44,5 +44,5 @@ test1/freertos.o: ..\Core\Src\freertos.c \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_tim_ex.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart.h \
   ..\Drivers\STM32H7xx_HAL_Driver\Inc\stm32h7xx_hal_uart_ex.h \
-  ..\Drivers\CMSIS\RTOS2\Include\cmsis_os2.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stdio.h
+  ..\Drivers\CMSIS\RTOS2\Include\cmsis_os2.h ..\Core\Inc\app\app.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stdio.h

@@ -22,7 +22,7 @@
 |------|-----------|---------|
 | GPS 定位 | UART | 经纬度实时采集 |
 | NFC 激活 | SPI（或 I2C） | 无源标签一键唤醒设备 |
-| 温湿度监测 | I2C（SHT30） | 实时温湿度采集 + 阈值报警 |
+| 温湿度监测 | I2C（SHT31） | 实时温湿度采集 + 阈值报警 |
 | 声光报警 | GPIO（LED/Buzzer） | 本地超限声光提示 |
 | 低功耗管理 | RTC / Stop 模式 | 默认深度睡眠，NFC 唤醒 |
 | 云平台通信 | UART → ESP8266(AT) / 4G → MQTT | 数据上报 + 指令接收 |
@@ -111,7 +111,7 @@ while (1)
 |------|--------|------|
 | Task_StateMachine | 高 | 状态机调度 + 低功耗 + 云指令分发 |
 | Task_4G_MQTT | 高 | USART1 AT指令 + MQTT 收发 |
-| Task_I2C_Sensors | 中 | SHT30 + PN532（共享 I2C1） |
+| Task_I2C_Sensors | 中 | SHT31 + PN532（共享 I2C1） |
 | Task_GPS | 中 | USART2 + NMEA 解析 |
 | Task_Flash | 低 | W25Q128 读写缓存 |
 | Task_Alarm | 低 | LED + 蜂鸣器 |
@@ -125,7 +125,7 @@ while (1)
 3. USART 串口 — 调试输出
 4. FreeRTOS — 多任务调度 + 队列通信
 5. 定时器 — TIM
-6. I2C — SHT30 温湿度传感器
+6. I2C — SHT31 温湿度传感器
 7. SPI — NFC 模块
 8. UART — GPS 模块
 9. MQTT — 云平台通信

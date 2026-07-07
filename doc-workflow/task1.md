@@ -14,7 +14,7 @@
 
 | Task | 成员 | 优先级 | 栈大小 | 职责 |
 |------|------|--------|--------|------|
-| `Task_I2C_Sensors` | A | 中 | 512B | SHT30 温湿度 + PN532 NFC（共享 I2C1） |
+| `Task_I2C_Sensors` | A | 中 | 512B | SHT31 温湿度 + PN532 NFC（共享 I2C1） |
 | `Task_Flash` | A | 低 | 512B | W25Q128 读写缓存 |
 | `Task_GPS` | B | 中 | 512B | USART2 接收 + NMEA 解析 |
 | `Task_4G_MQTT` | B | 高 | 1KB | USART1 AT指令 + MQTT 收发 |
@@ -124,7 +124,7 @@ git add -A && git commit -m "before CubeMX FreeRTOS config"
 |-----------|----------|-------------------|----------------|------|
 | Task_StateMachine | osPriorityHigh | 256 | StartTask_StateMachine | 状态机 + 指令分发 |
 | Task_4G_MQTT | osPriorityHigh | 256 | StartTask_4G_MQTT | 4G AT + MQTT |
-| Task_I2C_Sensors | osPriorityNormal | 128 | StartTask_I2C_Sensors | SHT30 + PN532 |
+| Task_I2C_Sensors | osPriorityNormal | 128 | StartTask_I2C_Sensors | SHT31 + PN532 |
 | Task_GPS | osPriorityNormal | 128 | StartTask_GPS | GPS 接收解析 |
 | Task_Flash | osPriorityLow | 128 | StartTask_Flash | Flash 读写 |
 | Task_Alarm | osPriorityLow | 128 | StartTask_Alarm | LED + 蜂鸣器 |
@@ -345,14 +345,14 @@ git add -A && git commit -m "CubeMX FreeRTOS: 6 task + 3 queue + printf heartbea
 - Stub 返回模拟数据，真实硬件到后替换内部实现即可
 
 ```c
-// sht30.c — stub 版本
-void SHT30_Init(void) {
-    printf("[SHT30] Init OK (stub)\n");
+// sht31.c — stub 版本
+void SHT31_Init(void) {
+    printf("[SHT31] Init OK (stub)\n");
 }
-float SHT30_ReadTemperature(void) {
+float SHT31_ReadTemperature(void) {
     return 25.5f;  // 模拟室温
 }
-float SHT30_ReadHumidity(void) {
+float SHT31_ReadHumidity(void) {
     return 60.0f;  // 模拟湿度
 }
 ```
@@ -360,7 +360,7 @@ float SHT30_ReadHumidity(void) {
 **所有需要 stub 的模块：**
 | 模块 | 文件 | 初始化 | stub 返回值 |
 |------|------|--------|-----------|
-| SHT30 | sensor/sht30.c | I2C1 Init | temp=25.5°C, hum=60% |
+| SHT31 | sensor/sht31.c | I2C1 Init | temp=25.5°C, hum=60% |
 | PN532 | nfc/pn532.c | I2C1 Init | UID="MOCK-UID-001" |
 | GPS | gps/gps.c | USART2 Init | lat=31.23, lon=121.47 |
 | Air780E | air780e/air780e.c | USART1 Init | AT OK, CSQ=25 |
@@ -373,12 +373,12 @@ float SHT30_ReadHumidity(void) {
 
 每个 stub 模块替换为真实驱动时，只需修改对应 `<module>.c` 的内部实现，**接口函数签名不变**，应用层代码零改动。
 
-例如 SHT30：
+例如 SHT31：
 ```c
 // stub → 真实：只改函数体，不改头文件
-float SHT30_ReadTemperature(void) {
+float SHT31_ReadTemperature(void) {
     uint8_t data[6];
-    HAL_I2C_Master_Receive(&hi2c1, SHT30_ADDR, data, 6, 100);
+    HAL_I2C_Master_Receive(&hi2c1, SHT31_ADDR, data, 6, 100);
     // ... 真实 CRC 校验 + 温度计算公式
     return temp;
 }
@@ -407,7 +407,7 @@ test1/Core/
     │   ├── state_machine.c       # 成员 C — 状态机
     │   ├── alarm.c               # 成员 C — 报警逻辑
     │   └── power.c               # 成员 C — 低功耗
-    ├── sensor/sht30.c            # 成员 A — stub
+    ├── sensor/sht31.c            # 成员 A — stub
     ├── nfc/pn532.c               # 成员 A — stub
     ├── flash/w25q128.c           # 成员 A — stub
     ├── gps/gps.c                 # 成员 B — stub

@@ -8,7 +8,7 @@
 - Air780E（4G+MQTT）
 - ATGM336H（GPS）
 - PN532（NFC）
-- SHT30（温湿度）
+- SHT31（温湿度）
 - W25Q128（Flash）
 - 云平台交互
 - 低功耗管理
@@ -33,7 +33,7 @@
 - TIM 定时器
 - RTC（如果使用）
 - W25Q128 驱动
-- SHT30 驱动
+- SHT31 驱动
 - PN532 驱动
 - 蜂鸣器
 - LED
@@ -47,7 +47,7 @@ BSP/
 ├── bsp_spi.c
 └── bsp_i2c.c
 sensor/
-└── sht30.c
+└── sht31.c
 nfc/
 └── pn532.c
 flash/
@@ -141,7 +141,7 @@ Project
 │   ├── power.c
 │   └── alarm.c
 ├── SENSOR
-│   └── sht30.c
+│   └── sht31.c
 ├── NFC
 │   └── pn532.c
 ├── GPS
@@ -181,15 +181,15 @@ main.c → APP → Driver → HAL → STM32
 例如由 A 提供接口：
 
 ```c
-void SHT30_Init(void);
-float SHT30_ReadTemperature(void);
-float SHT30_ReadHumidity(void);
+void SHT31_Init(void);
+float SHT31_ReadTemperature(void);
+float SHT31_ReadHumidity(void);
 ```
 
 B 只需要调用：
 
 ```c
-temp = SHT30_ReadTemperature();
+temp = SHT31_ReadTemperature();
 ```
 
 不用关心 I2C 细节。
@@ -211,7 +211,7 @@ Flash_Write();
 
 | 成员 | 主要内容 | 工作量 |
 | ---- | ------- | ------ |
-| A | STM32 底层驱动、SHT30、PN532、Flash、GPIO | ★★★★☆ |
+| A | STM32 底层驱动、SHT31、PN532、Flash、GPIO | ★★★★☆ |
 | B | Air780E、MQTT、GPS、云平台通信 | ★★★★★ |
 | C | 系统逻辑、状态机、低功耗、报警、主程序 | ★★★★☆ |
 

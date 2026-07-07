@@ -107,7 +107,7 @@ while (1)
 2.  按键中断（EXTI）
 3.  USART 串口
 4.  定时器（TIM）
-5.  I2C（SHT30）
+5.  I2C（SHT31）
 6.  SPI（NFC）
 7.  UART（GPS）
 8.  MQTT 云平台

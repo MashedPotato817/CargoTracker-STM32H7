@@ -1,8 +1,8 @@
 test1/port.o: \
   ..\Middlewares\Third_Party\FreeRTOS\Source\portable\GCC\ARM_CM7\r0p1\port.c \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stddef.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stdint.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stddef.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stdint.h \
   ..\Core\Inc\FreeRTOSConfig.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h \

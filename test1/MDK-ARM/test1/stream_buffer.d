@@ -1,9 +1,9 @@
 test1/stream_buffer.o: \
   ..\Middlewares\Third_Party\FreeRTOS\Source\stream_buffer.c \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stdint.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\string.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stdint.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\string.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h \
-  C:\Keil_v5MDK\ARM\ARMCLANG\include\stddef.h \
+  E:\App\Keil_v5\ARM\ARMCLANG\include\stddef.h \
   ..\Core\Inc\FreeRTOSConfig.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h \
   ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h \

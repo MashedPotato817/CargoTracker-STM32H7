@@ -636,6 +636,61 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>Application/User/App</GroupName>
+          <Files>
+            <File>
+              <FileName>app.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/app/app.c</FilePath>
+            </File>
+            <File>
+              <FileName>state_machine.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/app/state_machine.c</FilePath>
+            </File>
+            <File>
+              <FileName>alarm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/app/alarm.c</FilePath>
+            </File>
+            <File>
+              <FileName>power.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/app/power.c</FilePath>
+            </File>
+            <File>
+              <FileName>sht31.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/sensor/sht31.c</FilePath>
+            </File>
+            <File>
+              <FileName>pn532.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/nfc/pn532.c</FilePath>
+            </File>
+            <File>
+              <FileName>gps.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/gps/gps.c</FilePath>
+            </File>
+            <File>
+              <FileName>air780e.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/air780e/air780e.c</FilePath>
+            </File>
+            <File>
+              <FileName>mqtt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/air780e/mqtt.c</FilePath>
+            </File>
+            <File>
+              <FileName>w25q128.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/flash/w25q128.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Drivers/STM32H7xx_HAL_Driver</GroupName>
           <Files>
             <File>

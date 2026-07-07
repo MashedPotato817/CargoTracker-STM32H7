@@ -25,6 +25,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "app/app.h"
+#include "app/app_types.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -46,7 +48,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-extern osMessageQueueId_t queue_activationHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -198,13 +199,15 @@ void SystemClock_Config(void)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if (GPIO_Pin == GPIO_PIN_13) {
-        uint16_t event = 1;  // 1 = NFC 激活事件
-        osMessageQueuePut(queue_activationHandle, &event, 0, 0);
-        printf("[BTN] NFC activation event sent\n");
+        static uint32_t last_button_tick = 0;
+        uint32_t now_tick = HAL_GetTick();
 
-        /* 简单消抖：等待按键释放 */
-        HAL_Delay(50);
-        while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET);
+        if ((now_tick - last_button_tick) < 200U) {
+            return;
+        }
+
+        last_button_tick = now_tick;
+        App_SendActivationFromISR(APP_ACTIVATION_BUTTON);
     }
 }
 /* USER CODE END 4 */

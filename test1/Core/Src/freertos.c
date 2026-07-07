@@ -26,6 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "app/app.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -195,11 +196,7 @@ void MX_FREERTOS_Init(void) {
 void StartTask_StateMachine(void *argument)
 {
   /* USER CODE BEGIN StartTask_StateMachine */
-  for(;;)
-  {
-    printf("[StateMachine] heartbeat\n");
-    osDelay(1000);
-  }
+  App_TaskStateMachine();
   /* USER CODE END StartTask_StateMachine */
 }
 
@@ -213,11 +210,7 @@ void StartTask_StateMachine(void *argument)
 void StartTask_4G_MQTT(void *argument)
 {
   /* USER CODE BEGIN StartTask_4G_MQTT */
-  for(;;)
-  {
-    printf("[4G_MQTT] heartbeat\n");
-    osDelay(2000);
-  }
+  App_Task4GMQTT();
   /* USER CODE END StartTask_4G_MQTT */
 }
 
@@ -231,11 +224,7 @@ void StartTask_4G_MQTT(void *argument)
 void StartTask_I2C_Sensors(void *argument)
 {
   /* USER CODE BEGIN StartTask_I2C_Sensors */
-  for(;;)
-  {
-    printf("[I2C_Sensors] heartbeat\n");
-    osDelay(3000);
-  }
+  App_TaskI2CSensors();
   /* USER CODE END StartTask_I2C_Sensors */
 }
 
@@ -249,11 +238,7 @@ void StartTask_I2C_Sensors(void *argument)
 void StartTask_GPS(void *argument)
 {
   /* USER CODE BEGIN StartTask_GPS */
-  for(;;)
-  {
-    printf("[GPS] heartbeat\n");
-    osDelay(3000);
-  }
+  App_TaskGPS();
   /* USER CODE END StartTask_GPS */
 }
 
@@ -267,11 +252,7 @@ void StartTask_GPS(void *argument)
 void StartTask_Flash(void *argument)
 {
   /* USER CODE BEGIN StartTask_Flash */
-  for(;;)
-  {
-    printf("[Flash] heartbeat\n");
-    osDelay(5000);
-  }
+  App_TaskFlash();
   /* USER CODE END StartTask_Flash */
 }
 
@@ -285,11 +266,7 @@ void StartTask_Flash(void *argument)
 void StartTask_Alarm(void *argument)
 {
   /* USER CODE BEGIN StartTask_Alarm */
-  for(;;)
-  {
-    printf("[Alarm] heartbeat\n");
-    osDelay(5000);
-  }
+  App_TaskAlarm();
   /* USER CODE END StartTask_Alarm */
 }
 
