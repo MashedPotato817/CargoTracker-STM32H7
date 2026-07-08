@@ -152,7 +152,7 @@ git commit -m "pre-cube: 外设使能前快照"
 
 | 文件 | 操作 | 负责人 | 状态 |
 |------|------|--------|------|
-| `test1/test1.ioc` | 修改（使能外设 + PB0→PWRKEY） | A → C | ✅ 已完成 |
+| `test1/test1.ioc` | 修改（使能外设 + PB0→PWRKEY） | A → C | ⚠️ 当前工作区缺失，需从本地/团队工程恢复 |
 | `test1/Core/Inc/FreeRTOSConfig.h` | 修改（FPU=1） | A | ✅ 已设置 |
 | `test1/Core/Src/sensor/sht31.c` | 验证（flag=1） | A | ⚠️ 待硬件 |
 | `test1/Core/Src/nfc/pn532.c` | 验证（flag=1） | A | ⚠️ 待硬件 |
@@ -160,11 +160,11 @@ git commit -m "pre-cube: 外设使能前快照"
 | `test1/Core/Src/gps/gps.c` | 修改（USART2 替代 stub） | B | ✅ 代码完成 |
 | `test1/Core/Src/air780e/air780e.c` | 修改（USART1 替代 stub） | B | ✅ 代码完成 |
 | `test1/Core/Src/air780e/mqtt.c` | 修改（真实 AT 交互） | B | ✅ 代码完成 |
-| `test1/Core/Src/app/alarm.c` | 修改（PC8蜂鸣器+PC9 LED） | C | 🔧 待实现 |
+| `test1/Core/Src/app/alarm.c` | 修改（PC8蜂鸣器+PE1心跳/报警灯） | C | ✅ 已实现，待硬件验证 |
 | `test1/Core/Src/app/power.c` | 修改（PWRKEY 时序） | C | ✅ 已完成 |
 | `test1/Core/Inc/main.h` | 补充引脚宏 | C | ✅ 已完成 |
 | `test1/Core/Inc/usart.h` | 补充 huart1/2 声明 | C | ✅ 已完成 |
 | `test1/Core/Src/usart.c` | 补充 USART1/2 初始化 | C | ✅ 已完成 |
 | `test1/Core/Src/gpio.c` | 补充 W25Q128_CS/Buzzer/LED | C | ✅ 已完成 |
 | `test1/Core/Inc/stm32h7xx_hal_conf.h` | 启用 SPI 模块 | C | ✅ 已完成 |
-| `test1/MDK-ARM/test1.uvprojx` | 修复 IncludePath/Flash/port.c | C | ✅ 已完成 |
+| `test1/MDK-ARM/test1.uvprojx` | 修复 IncludePath/Flash/port.c | C | ⚠️ 当前工作区缺失，需 CubeMX Generate Code 恢复后复查 |
