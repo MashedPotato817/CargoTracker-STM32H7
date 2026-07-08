@@ -32,26 +32,30 @@
 
 ```
 CargoTracker-STM32H7/
-├── .claude/                       # Claude Code 配置（团队共享 settings.json）
-├── AGENTS.md                      # Codex 指引（指向 CLAUDE.md）
-├── CLAUDE.md                      # 项目权威指引（供 Claude Code/Codex 使用）
+├── .claude/                       # Claude Code 项目记忆
+├── AGENTS.md                      # Codex 指引
+├── CLAUDE.md                      # 项目权威指引
 ├── README.md                      # 本文件
+├── index.html                     # 硬件接线指南（GitHub Pages）
 ├── doc/                           # 设计文档
-│   ├── task.md                    # 三人分工方案、接口规范
-│   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录详细步骤
-│   ├── STM32H7_CubeMX_Config.md   # CubeMX 引脚/时钟/DMA 完整配置
-│   └── STM32H7_Logistics_System.md # 完整设计方案（BOM/接线/电源/状态机）
+│   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录
+│   ├── STM32H7_CubeMX_Config.md   # CubeMX 配置
+│   └── STM32H7_Logistics_System.md # 系统方案
 ├── doc-workflow/                  # 开发工作流
-│   ├── task2.md                   #   当前任务：硬件集成
+│   ├── task2.md                   #   硬件集成（当前）
+│   ├── task3.md                   #   云平台对接
+│   ├── task3.1.md                 #     EMQX Cloud 注册
+│   ├── task4.md                   #   低功耗优化
+│   ├── task5.md                   #   整机测试 + 产出物
 │   ├── GIT_WORKFLOW.md            #   Git 协作规范
-│   ├── TROUBLESHOOTING.md         #   踩坑记录
+│   ├── TROUBLESHOOTING.md         #   踩坑记录（13 条）
 │   ├── hardware_map.md            #   硬件-代码映射表
-│   └── archive/                   #   历史日志归档
-├── user-manual-md/                # 参考手册（Markdown）
+│   └── archive/                   #   历史日志
+├── report-workflow/               # 论文/报告
+│   └── design_report.md           #   设计文档（8 章）
+├── user-manual-md/                # 参考手册
 └── test1/                         # Keil MDK 工程
-    ├── Core/                      # 核心源码
-    ├── Drivers/                   # HAL + CMSIS（CubeMX 生成，不入库）
-    └── MDK-ARM/                   # Keil 项目文件
+    └── Core/                      # 源码（Drivers/Middlewares 不入库）
 ```
 
 ## 快速开始

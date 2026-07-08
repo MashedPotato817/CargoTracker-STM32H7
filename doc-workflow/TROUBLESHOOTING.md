@@ -221,3 +221,32 @@ rg -n "RVDS|ARM_CM4F|port.c" test1/MDK-ARM
 2. 临时兼容：在 GPS 模块初始化中检测 `huart2.Init.BaudRate`，若不是 `9600`，调用 `HAL_UART_Init(&huart2)` 重新初始化为 9600。
 
 > 注意：最终提交前建议仍以 CubeMX 配置为准，避免后续重新生成代码后再次出现参数漂移。
+
+---
+
+### 13. CubeMX Generate Code 后必做三步修复
+
+**现象**：每次 CubeMX Generate Code 后，以下三个设置被覆盖，导致编译 177 错误或硬件不工作。
+
+**原因**：这三个配置都在 `USER CODE BEGIN/END` 段外，CubeMX 无法保留。
+
+**解决**：Generate Code 后立即执行以下三步：
+
+**Step 1: 修复 FreeRTOS port（否则 177 编译错误）**
+
+`test1.uvprojx` 中所有 `RVDS/ARM_CM4F` → `GCC/ARM_CM7/r0p1`
+
+**Step 2: 恢复 FPU**
+
+`Core/Inc/FreeRTOSConfig.h` 第 58 行：
+```c
+#define configENABLE_FPU    1   // CubeMX 默认 0，必须改
+```
+
+**Step 3: 恢复 Air780E PWRKEY**
+
+`Core/Inc/main.h`：`LD1_GREEN_Pin/Port` → `AIR780E_PWRKEY_Pin/Port`
+
+`Core/Src/gpio.c`：所有 `LD1_GREEN_Pin` → `AIR780E_PWRKEY_Pin`
+
+> 如果不需要 Generate Code，这三步**不用做**。
