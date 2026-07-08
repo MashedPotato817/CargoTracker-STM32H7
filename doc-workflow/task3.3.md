@@ -1,14 +1,15 @@
-# Task 3.3: 真 MQTT 云指令接收
+# Task 3.3: 真 MQTT 云指令接收 + 前端控制台
 
-> 🔴 必做 | 负责人：B | 依赖：Task 2.5 已完成
+> 🔴 必做 | 负责人：B（后端）+ C（前端） | 依赖：Task 2.5 已完成
 
 ## 当前状态
 
 - ✅ Air780E AT/MQTT 全链路已通（Task 2.5）
 - ✅ dashboard 按钮发布 `cargo/cmd` → broker 正常
-- ✅ `MQTT_Init()` 在 CONNECT 成功后订阅 `cargo/cmd`
-- ✅ `MQTT_PollCommand()` 已移除 stub 轮转伪造，改为读取真实 UART/TCP/MQTT 数据
-- ⚠️ 串口日志显示 CONNECT / SUBSCRIBE 已通，但 `AT+CIPRXGET=2,256` 超时且原 5s WAIT_CLOUD 窗口太短；已加长等待并加快轮询，待再次硬件验证
+- ✅ `MQTT_Init()` 在 CONNECT 成功后订阅 `cargo/cmd`（B: 3ac0d8b）
+- ✅ `MQTT_PollCommand()` 已移除 stub 轮转伪造，改为读取真实 UART/TCP/MQTT 数据（B: 3ac0d8b）
+- ✅ dashboard 断线自动重连（C: 2026-07-09）
+- ⚠️ 端到端验证：串口日志显示 CONNECT / SUBSCRIBE 已通，待再次硬件验证
 
 ## 目标
 
@@ -88,7 +89,26 @@ AppCloudCommand MQTT_PollCommand(void)
 
 ---
 
-## 验证
+## 前端控制台（C）
+
+### 已完成
+
+- ✅ dashboard 自动重连：`reconnectPeriod: 3s`、`connectTimeout: 10s`
+- ✅ 断线 → 重连中状态显示（`重连中(1)…`）
+- ✅ `error` 事件捕获 + 日志记录
+- ✅ 兼容硬件 `gps_valid` 字段名（`d.gps_v !== undefined ? d.gps_v : d.gps_valid`）
+- ✅ CSQ 信号强度 + 最后上报计时器（替代原电池条）
+
+### 验证前端
+
+```
+1. 打开 dashboard.html → 状态栏显示「已连接」绿灯
+2. 断开网络（飞行模式） → 状态栏显示「已断开，等待重连…」红灯
+3. 恢复网络 → 状态栏显示「重连中(1)…」→ 重新「已连接」绿灯
+4. 数据日志持续显示上报记录，无断连丢失
+```
+
+## 端到端验证（硬件）
 
 ```
 1. 编译 → 烧录 → 打开串口
@@ -97,16 +117,25 @@ AppCloudCommand MQTT_PollCommand(void)
 4. 状态机应打印: [StateMachine] cloud action: HOLD
 ```
 
-### 当前代码侧验证
+### 代码侧验证
 
 - ✅ `test1/Core/Src/air780e/mqtt.c` 已删除真实 UART 模式下的 stub 轮转 fallback
 - ✅ 当前实现使用 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()` 解析 PUBLISH payload 或 raw/CIPRXGET 返回内容
 - ✅ `STATE_WAIT_CLOUD` 已改为 30s，`Task_4G_MQTT` 已改为 1s 轮询
 - ✅ MinGW `gcc -fsyntax-only` 对 `mqtt.c` 语法检查通过（仅 CMSIS 在 x86 下的指针宽度 warning）
+- ✅ `dashboard.html` 自动重连机制已验证（`mqtt.js` reconnect 事件）
 - ⚠️ 当前工作区缺少 `test1/test1.ioc` 和 `test1/MDK-ARM/test1.uvprojx`，无法运行 UV4 Keil 构建；需先从本地/团队工程恢复 CubeMX/Keil 工程文件，再执行完整编译验证
+
+## 变更文件
+
+| 文件 | 改动 | 提交 |
+|------|------|------|
+| `test1/Core/Src/air780e/mqtt.c` | 真 MQTT 指令接收（删 stub、三阶段解析） | 3ac0d8b (B) |
+| `dashboard.html` | 断线自动重连 + 状态反馈 | 待提交 (C) |
 
 ## 参考
 
 - 当前代码：`test1/Core/Src/air780e/mqtt.c`（`MQTT_PollCommand` 函数）
 - 命令解析：`mqtt.c` 中 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()`
 - 状态机处理：`app.c` 中 `STATE_WAIT_CLOUD` 段
+- 前端日志：`doc-workflow/log3.3.md`

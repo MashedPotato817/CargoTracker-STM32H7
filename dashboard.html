@@ -168,18 +168,34 @@ setInterval(() => {
 const client = mqtt.connect(`wss://${BROKER}:${PORT}${PATH}`, {
   clientId: 'dashboard_' + Math.random().toString(16).slice(2, 8),
   clean: true,
+  reconnectPeriod: 3000,       // 断线后 3s 开始重连
+  connectTimeout: 10000,       // 10s 连接超时
 });
 
+let reconnectAttempts = 0;
+
 client.on('connect', () => {
+  reconnectAttempts = 0;
   dot.className = 'dot online';
   statusText.textContent = '已连接';
   client.subscribe(TOPIC_TELEM);
   addLog('system', '已连接 broker.emqx.io');
 });
 
+client.on('reconnect', () => {
+  reconnectAttempts++;
+  dot.className = 'dot offline';
+  statusText.textContent = `重连中(${reconnectAttempts})…`;
+});
+
 client.on('close', () => {
   dot.className = 'dot offline';
-  statusText.textContent = '已断开';
+  statusText.textContent = '已断开，等待重连…';
+});
+
+client.on('error', (err) => {
+  console.error('MQTT error:', err);
+  addLog('system', '连接错误: ' + (err.message || err));
 });
 
 client.on('message', (topic, payload) => {
