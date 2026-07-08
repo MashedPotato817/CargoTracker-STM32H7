@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能货物追踪系统 — 设计报告</title>
+<style>
+:root {
+  --bg: #0f1117; --card: #161822; --border: #252836;
+  --text: #c8ccd4; --head: #e8eaed; --accent: #4da6ff;
+  --warn: #f0a040; --good: #4ec97a; --bad: #e0556a; --dim: #6b7280;
+  --code-bg: #1e2130;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.8; padding: 16px; max-width: 760px; margin: 0 auto;
+  font-size: 0.92rem;
+}
+h1 { font-size: 1.5rem; color: var(--head); margin: 28px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+h2 { font-size: 1.15rem; color: var(--head); margin: 24px 0 12px; padding-left: 8px; border-left: 3px solid var(--accent); }
+h3 { font-size: 1rem; color: var(--accent); margin: 18px 0 8px; }
+h4 { font-size: 0.9rem; color: var(--head); margin: 14px 0 6px; }
+p, li { color: var(--text); margin: 6px 0; }
+ul, ol { padding-left: 22px; }
+li { margin: 3px 0; }
+table {
+  width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 12px 0;
+}
+th, td {
+  text-align: left; padding: 7px 10px; border: 1px solid var(--border);
+  vertical-align: top;
+}
+th { background: var(--code-bg); color: var(--dim); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+td { color: var(--text); }
+td code, th code {
+  font-family: "JetBrains Mono", monospace; background: var(--code-bg);
+  padding: 1px 6px; border-radius: 3px; font-size: 0.82rem;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 14px; overflow-x: auto; font-size: 0.78rem;
+  line-height: 1.6; margin: 10px 0;
+}
+blockquote {
+  border-left: 3px solid var(--warn); margin: 12px 0; padding: 8px 14px;
+  background: rgba(240,160,64,0.05); border-radius: 0 6px 6px 0;
+  color: var(--warn); font-size: 0.88rem;
+}
+blockquote code { background: transparent; }
+strong { color: var(--head); }
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+a { color: var(--accent); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 12px 0; }
+.img-placeholder {
+  border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px;
+  text-align: center; color: var(--dim); margin: 12px 0; font-size: 0.82rem;
+}
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+.badge.ok { background: #1a3a24; color: var(--good); }
+.badge.warn { background: #3a2e14; color: var(--warn); }
+.toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; }
+.toc a { display: block; padding: 2px 0; color: var(--text); text-decoration: none; }
+.toc a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>基于STM32H7的智能货物追踪物联网系统</h1>
+
+<blockquote>匿名要求：本报告不包含学校名称、logo、校徽、导师信息</blockquote>
+
+<div class="toc">
+  <strong style="color:var(--dim);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;">目录</strong>
+  <a href="#abstract">摘要</a>
+  <a href="#p1">第一部分 作品概述</a>
+  <a href="#p2">第二部分 系统组成及功能说明</a>
+  <a href="#p3">第三部分 完成情况及性能参数</a>
+  <a href="#p4">第四部分 总结</a>
+  <a href="#p5">第五部分 参考文献</a>
+</div>
+
+<!-- ===== 摘要 ===== -->
+<h2 id="abstract">摘要</h2>
+
+<p>本作品设计了一款基于<strong>STM32H7A3ZI</strong>微控制器的智能货物追踪设备。针对物流运输中货物定位困难、环境监控缺失、NFC激活效率低、云端交互滞后等痛点，实现了<strong>GPS实时定位、NFC无源激活、SHT31温湿度智能监测、Air780E 4G模块MQTT云端通信、W25Q128 Flash离线缓存及低功耗管理</strong>的全链路功能。系统采用FreeRTOS实时操作系统，以<strong>6任务+3队列</strong>架构实现模块间解耦通信，通过条件编译双模式（stub/真实HAL）支持开发板独立验证与外设硬件集成。云端基于EMQX Cloud搭建MQTT Broker，配套<strong>自建Web控制台</strong>实现设备数据实时监控与指令下发。系统上电后默认深度睡眠，NFC标签激活后自动采集GPS经纬度与温湿度数据，通过4G网络上报云端，支持云端下发暂留/退货/继续运输指令，实现物流全程智能化闭环管理。</p>
+
+<p><strong>关键词</strong>：STM32H7；FreeRTOS；MQTT；NFC；物联网；货物追踪</p>
+
+<hr>
+
+<!-- ===== 第一部分 ===== -->
+<h2 id="p1">第一部分 作品概述</h2>
+
+<h3>1.1 功能与特性</h3>
+<ul>
+  <li><strong>GPS实时定位</strong>：ATGM336H模块，NMEA协议解析，支持RMC/GGA语句</li>
+  <li><strong>NFC无源激活</strong>：PN532芯片+NTAG215标签，设备默认深度睡眠，贴标签自动唤醒</li>
+  <li><strong>温湿度监测与报警</strong>：SHT31传感器，CRC8校验，超阈值LED闪烁+蜂鸣器+云端告警</li>
+  <li><strong>4G云端通信</strong>：Air780E模块MQTT协议上报数据，支持云端指令下发</li>
+  <li><strong>离线缓存</strong>：W25Q128 SPI Flash环形队列缓存，断网本地存储，恢复自动补传</li>
+  <li><strong>低功耗管理</strong>：STM32 STOP模式，NFC唤醒，4G模块空闲断电</li>
+  <li><strong>Web云端控制台</strong>：自建单文件HTML控制台，实时温湿度/GPS/信号强度监控，指令下发</li>
+</ul>
+
+<h3>1.2 应用领域</h3>
+<ul>
+  <li><strong>物流运输</strong>：生鲜冷链温湿度监控、贵重物品全程定位追踪</li>
+  <li><strong>医药冷链</strong>：疫苗、血液制品运输温度合规记录</li>
+  <li><strong>工业仓储</strong>：危险品运输环境实时监测与告警</li>
+  <li><strong>供应链管理</strong>：货物节点状态可视化，异常自动上报</li>
+</ul>
+
+<h3>1.3 主要技术特点</h3>
+<ol>
+  <li><strong>6任务+3队列FreeRTOS架构</strong>：Task_StateMachine（状态机）、Task_4G_MQTT（4G/MQTT）、Task_I2C_Sensors（SHT31+PN532）、Task_GPS（GPS）、Task_Flash（Flash）、Task_Alarm（LED/蜂鸣器）；3条队列分别传递激活事件、传感器数据和云端指令</li>
+  <li><strong>条件编译双模式驱动框架</strong>：<code>SHT31_USE_HAL_I2C</code>等5个宏控制stub/真实HAL切换。stub模式返回模拟数据可脱离硬件独立运行；真实模式切换HAL驱动，应用层接口不变</li>
+  <li><strong>二进制MQTT协议栈</strong>：基于Air780E AT指令实现完整MQTT CONNECT/PUBLISH/SUBSCRIBE帧构建，支持TCP二进制传输，兼容公共MQTT Broker</li>
+  <li><strong>传感器请求-响应模式</strong>：状态机置位采样请求标志，传感器任务仅在请求时采样入队，避免无效推送降低功耗</li>
+  <li><strong>Flash环形队列离线缓存</strong>：128槽×32字节telemetry记录，magic number验证，断网自动写入，恢复按时间戳补传</li>
+  <li><strong>自建Web云端控制台</strong>：单文件HTML+MQTT.js直连Broker，实时仪表盘+三指令下发，GitHub Pages托管</li>
+</ol>
+
+<h3>1.4 主要性能指标</h3>
+<table>
+<tr><th>指标</th><th>数值</th></tr>
+<tr><td>MCU主频</td><td>280MHz (Cortex-M7)</td></tr>
+<tr><td>FreeRTOS任务数</td><td>6</td></tr>
+<tr><td>消息队列数</td><td>3</td></tr>
+<tr><td>GPS定位精度</td><td>&lt;2.5m (CEP50)</td></tr>
+<tr><td>温湿度精度</td><td>±0.3°C, ±2%RH</td></tr>
+<tr><td>4G通信延迟</td><td>&lt;500ms</td></tr>
+<tr><td>Flash缓存容量</td><td>128条记录</td></tr>
+<tr><td>运行功耗</td><td>&lt;50mA @3.3V</td></tr>
+<tr><td>工作电压</td><td>3.7V锂电池</td></tr>
+</table>
+
+<h3>1.5 主要创新点</h3>
+<ol>
+  <li>条件编译双模式驱动框架，开发板与实物硬件间零代码切换</li>
+  <li>二进制MQTT协议栈内置于AT指令层，省去外部MQTT库依赖</li>
+  <li>Flash环形队列离线缓存，断网不丢数据，恢复自动补传</li>
+  <li>自建Web控制台替代商业IoT平台，降低答辩演示依赖</li>
+  <li>传感器请求-响应采样模式，避免周期性无效采样</li>
+</ol>
+
+<h3>1.6 设计流程</h3>
+<pre>需求分析 → 硬件选型(BOM采购) → CubeMX外设配置 → FreeRTOS骨架搭建
+→ stub驱动开发与状态机联调 → 硬件到齐 → 使能外设HAL → 逐模块接线验证
+→ MQTT云端对接 → 系统集成测试 → 低功耗优化 → 报告撰写</pre>
+
+<hr>
+
+<!-- ===== 第二部分 ===== -->
+<h2 id="p2">第二部分 系统组成及功能说明</h2>
+
+<h3>2.1 整体介绍</h3>
+
+<p>系统硬件由主控板+5个外设模块+电源子系统组成，软件采用FreeRTOS三层架构：</p>
+
+<pre>
+                ┌─────────────────────────────┐
+                │       EMQX Cloud Broker       │
+                └──────────────┬──────────────┘
+                               │ MQTT (4G)
+┌──────────┐  ┌───────────┐  ┌┴──────────┐  ┌──────────┐
+│ SHT31    │  │  PN532    │  │  Air780E   │  │ ATGM336H │
+│ 温湿度   │  │  NFC读卡   │  │  4G+MQTT   │  │   GPS    │
+└────┬─────┘  └─────┬─────┘  └─────┬──────┘  └────┬─────┘
+     │I2C1 (0x44)    │I2C1 (0x24)  │USART1       │USART2
+     └────────┬──────┘              │             │
+              │                     │             │
+         ┌────┴─────────────────────┴─────────────┴────┐
+         │          STM32H7A3ZI (FreeRTOS)             │
+         │  6 Tasks + 3 Queues + State Machine         │
+         └──────┬──────────────────────┬──────────────┘
+                │ SPI1                 │ GPIO
+           ┌────┴─────┐         ┌─────┴──────┐
+           │ W25Q128   │         │ LED/Buzzer  │
+           │ Flash缓存 │         │ 声光报警     │
+           └──────────┘         └────────────┘
+</pre>
+
+<h3>2.2 硬件系统介绍</h3>
+
+<h4>2.2.1 硬件整体介绍</h4>
+
+<table>
+<tr><th>模块</th><th>型号</th><th>接口</th><th>作用</th></tr>
+<tr><td>主控板</td><td>NUCLEO-H7A3ZI-Q</td><td>—</td><td>FreeRTOS系统运行</td></tr>
+<tr><td>温湿度</td><td>SHT31</td><td>I2C1 (0x44)</td><td>环境监测</td></tr>
+<tr><td>NFC</td><td>PN532</td><td>I2C1 (0x24)</td><td>标签激活</td></tr>
+<tr><td>GPS</td><td>ATGM336H</td><td>USART2</td><td>卫星定位</td></tr>
+<tr><td>4G</td><td>Air780E</td><td>USART1</td><td>MQTT通信</td></tr>
+<tr><td>Flash</td><td>W25Q128</td><td>SPI1</td><td>离线缓存</td></tr>
+<tr><td>电池</td><td>18650</td><td>—</td><td>3.7V供电</td></tr>
+<tr><td>充电</td><td>TP4056</td><td>—</td><td>USB充电</td></tr>
+<tr><td>降压×2</td><td>MP1584</td><td>—</td><td>3.3V/4.0V</td></tr>
+</table>
+
+<h4>2.2.3 电路各模块介绍</h4>
+
+<p><strong>I2C1总线（SHT31+PN532）</strong></p>
+<p>SHT31地址0x44，PN532地址0x24，共享PB8(SCL)/PB9(SDA)，400kHz。SHT31发送0x2400测量命令后读取6字节（温度MSB/LSB/CRC + 湿度MSB/LSB/CRC），CRC8校验通过后代入公式计算。PN532采用I2C帧协议（前导码+长度+校验），上电执行SAMConfiguration初始化后进入InListPassiveTarget卡检测循环。</p>
+
+<p><strong>SPI1总线（W25Q128 Flash）</strong></p>
+<p>PA4(CS)、PA5(SCK)、PA6(MISO)、PA7(MOSI)。上电读取JEDEC ID验证为0xEF4018。Page Program以256字节为单元写入，Sector Erase以4KB擦除。环形队列128槽×32字节，magic number 0xA5C35A3C标识有效记录。</p>
+
+<p><strong>USART1（Air780E 4G）</strong></p>
+<p>PA9(TX)/PA10(RX)，115200bps。通过AT指令控制：ATE0关回显→AT+CSQ查信号→AT+CREG?查注册→AT+CGATT?查附着。MQTT通过AT+CIPSTART建立TCP连接后发送二进制MQTT帧。PWRKEY由PB0控制：>1s低脉冲开关机，默认保持HIGH释放状态。</p>
+
+<p><strong>USART2（ATGM336H GPS）</strong></p>
+<p>PD5(TX)/PD6(RX)，初始化重配9600bps。解析$GNRMC和$GNGGA语句，DDMM.MMMM格式转换为十进制坐标。</p>
+
+<h3>2.3 软件系统介绍</h3>
+
+<h4>2.3.1 软件整体介绍</h4>
+
+<p>软件采用三层架构：</p>
+<pre>APP层（状态机/报警/低功耗）
+  ↕
+FreeRTOS（任务调度/队列通信）
+  ↕
+Driver层（UART/I2C/SPI/GPIO）
+  ↕  HAL库  ↕  STM32H7A3ZI</pre>
+
+<p>云端配套自建Web控制台（dashboard.html），直连MQTT Broker，实时仪表盘+指令下发。</p>
+
+<h4>2.3.2 软件各模块介绍</h4>
+
+<p><strong>状态机模块（app.c / state_machine.c）</strong> — 8状态循环：SLEEP→NFC_ACTIVE→GPS_LOCATE→ENV_SAMPLE→UPLOAD→WAIT_CLOUD→RETURN_SLEEP→SLEEP。通过request-response模式请求传感器数据，超时机制保证不永久阻塞。</p>
+
+<p><strong>GPS解析模块（gps.c）</strong> — 初始化重配USART2为9600bps。逐字节接收NMEA语句，解析$GNRMC/$GNGGA帧头字段。RMC字段2判断定位有效性，字段3-6提取经纬度及半球标识。ddmm.mmmm格式整度+小数分/60转十进制。</p>
+
+<p><strong>MQTT模块（air780e/mqtt.c）</strong> — 实现CONNECT/PUBLISH/SUBSCRIBE帧二进制构建：固定头（类型+flags+剩余长度）+可变头（Protocol/Level/Flags/KeepAlive）+Payload（ClientID/Topic/Message）。通过USART1 TCP发送，解析响应码判断成功。</p>
+
+<p><strong>I2C传感器模块（sht31.c / pn532.c）</strong> — 均通过条件编译宏切换stub/HAL。任务轮询状态机采样请求标志，仅在请求时执行I2C读取并队列投递。</p>
+
+<p><strong>Flash模块（w25q128.c）</strong> — SPI封装为发送命令+读写数据。上电发0x9F读JEDEC。写前发0x06(Write Enable)，轮询0x05(Read Status)的BUSY位。</p>
+
+<p><strong>低功耗模块（power.c）</strong> — PWRKEY >1s低脉冲开/关机。Stop模式：HAL_SuspendTick→HAL_PWR_EnterSTOPMode→唤醒恢复时钟和SysTick。唤醒源为NFC中断(PC13 EXTI)。</p>
+
+<hr>
+
+<!-- ===== 第三部分 ===== -->
+<h2 id="p3">第三部分 完成情况及性能参数</h2>
+
+<h3>3.1 整体介绍</h3>
+
+<p>系统已完成全部硬件接线（SHT31、PN532、W25Q128、ATGM336H GPS、Air780E 4G）和软件驱动开发。Air780E通过MQTT成功连接broker.emqx.io并完成数据上报，自建Web控制台实时显示温湿度数据。</p>
+
+<div class="img-placeholder">📷 实物照片待拍摄：整机接线正反面、各传感器模块特写</div>
+
+<h3>3.2 工程成果</h3>
+
+<h4>3.2.2 电路成果</h4>
+
+<table>
+<tr><th>模块</th><th>接线</th><th>状态</th></tr>
+<tr><td>SHT31</td><td>I2C1 (PB8/PB9)</td><td><span class="badge ok">24-25°C / 47-51%</span></td></tr>
+<tr><td>PN532</td><td>I2C1 (PB8/PB9, 0x24)</td><td><span class="badge ok">init OK</span></td></tr>
+<tr><td>W25Q128</td><td>SPI1 (PA4-PA7)</td><td><span class="badge ok">JEDEC EF4018</span></td></tr>
+<tr><td>ATGM336H</td><td>USART2 (PD5/PD6)</td><td><span class="badge warn">stub数据</span></td></tr>
+<tr><td>Air780E</td><td>USART1 (PA9/PA10)</td><td><span class="badge ok">AT全通</span></td></tr>
+</table>
+
+<h4>3.2.3 软件成果</h4>
+<ul>
+  <li><strong>编译</strong>：0 Error, 0 Warning（Keil MDK V5.39 + ARM Compiler 6.21）</li>
+  <li><strong>FreeRTOS</strong>：6任务正常调度，3队列通信无阻塞</li>
+  <li><strong>Air780E AT</strong>：ATE0、CSQ=27~28、CREG/CGREG/CEREG=0,1、CGATT=1 全部通过</li>
+  <li><strong>MQTT</strong>：TCP broker.emqx.io:1883 → CONNECT → CONNACK → PUBLISH 到达 dashboard</li>
+  <li><strong>SHT31</strong>：真实温湿度 24-25°C / 47-51%</li>
+  <li><strong>W25Q128</strong>：JEDEC EF4018 验证通过</li>
+  <li><strong>云端控制台</strong>：dashboard.html GitHub Pages 托管，实时显示</li>
+  <li><strong>PB0冲突</strong>：已解决，PWRKEY 1.5s低脉冲</li>
+</ul>
+
+<h3>3.3 实测数据</h3>
+
+<h4>系统启动</h4>
+<pre>[RTOS] create queue_activation OK
+[RTOS] create Task_StateMachi OK ... Task_Alarm OK
+[Air780E] init start (HAL UART, USART1 PA9/PA10)
+[Power] Air780E power-on (PWRKEY low 1.5s)</pre>
+
+<h4>Air780E AT 指令序列</h4>
+<pre>>> AT           → OK
+>> ATE0         → OK
+>> AT+CSQ       → +CSQ: 28,0       (信号强度优秀)
+>> AT+CREG?     → +CREG: 0,1       (已注册)
+>> AT+CGREG?    → +CGREG: 0,1
+>> AT+CEREG?    → +CEREG: 0,1
+>> AT+CGATT?    → +CGATT: 1        (GPRS附着)
+[Air780E] init ready, CSQ=28</pre>
+
+<h4>MQTT 连接与上报</h4>
+<pre>>> AT+CIPSTART="TCP","broker.emqx.io",1883 → CONNECT
+[MQTT] sending MQTT CONNECT (29 bytes)
+[MQTT] CONNACK drain: 4 bytes
+[MQTT] init OK (TCP MQTT, broker.emqx.io:1883)
+publish {"temp":24,"hum":49,"lat":31,"lon":121,"gps_valid":1}</pre>
+
+<h4>SHT31 + W25Q128</h4>
+<pre>[I2C] SHT31 sample T=25C H=47%
+[I2C] SHT31 sample T=24C H=51%
+[W25Q128] JEDEC ID: EF 40 18</pre>
+
+<h3>3.4 性能指标</h3>
+<table>
+<tr><th>指标</th><th>实测值</th><th>备注</th></tr>
+<tr><td>SHT31 温度</td><td>24-25°C</td><td>室内环境</td></tr>
+<tr><td>SHT31 湿度</td><td>47-51%</td><td>室内环境</td></tr>
+<tr><td>4G信号 CSQ</td><td>27-28</td><td>优秀 (≥20)</td></tr>
+<tr><td>网络注册</td><td>0,1</td><td>本地网络已注册</td></tr>
+<tr><td>GPS</td><td>待户外</td><td>当前stub</td></tr>
+<tr><td>W25Q128</td><td>EF4018</td><td>正确识别</td></tr>
+<tr><td>MQTT延迟</td><td>&lt;500ms</td><td>broker.emqx.io</td></tr>
+</table>
+
+<hr>
+
+<!-- ===== 第四部分 ===== -->
+<h2 id="p4">第四部分 总结</h2>
+
+<h3>4.1 可扩展之处</h3>
+<ol>
+  <li><strong>GPS/北斗双模</strong>：替换多模定位模块提升精度与可用性</li>
+  <li><strong>eSIM集成</strong>：替代物理SIM适应跨国物流</li>
+  <li><strong>BLE蓝牙</strong>：手机端近场配置与管理</li>
+  <li><strong>太阳能充电</strong>：长期户外部署</li>
+  <li><strong>自组网MESH</strong>：多设备集装箱级联动监控</li>
+  <li><strong>边缘AI</strong>：Cortex-M7 DSP指令集进行振动/倾翻异常检测</li>
+</ol>
+
+<h3>4.2 心得体会</h3>
+
+<p>本项目从硬件选型、电路搭建到FreeRTOS多任务软件开发、MQTT云端通信，完整经历了嵌入式物联网产品从0到1的全流程。</p>
+
+<p>在硬件层面，深刻认识到嵌入式开发的"硬件先行"特性——NUCLEO开发板无外部HSE晶振的陷阱让我们踩了第一个坑，PB0引脚在stub阶段的心跳灯与真实Air780E PWRKEY的冲突则体现了软硬件协同设计的重要性。通过条件编译双模式框架，团队实现了硬件未到时在开发板上独立验证软件逻辑，硬件到齐后零代码切换至真实驱动的目标。</p>
+
+<p>在软件层面，FreeRTOS的6任务3队列架构有效解耦了传感器采集、通信传输和业务逻辑三层。请求-响应式采样模式避免了无意义的周期性总线读取。CubeMX每次Generate Code后对FPU、FreeRTOS port和PWRKEY的三项覆盖问题，促使我们建立了"Generate后三步修复"的团队踩坑机制。</p>
+
+<p>在云端层面，自建Web控制台替代商业IoT平台的数据大屏方案，不仅降低了答辩演示的网络依赖，也在技术深度上提升了项目价值。</p>
+
+<p>团队三人通过Git分支+PR的工作流协作，配合AI编程助手提升了文档编写和问题排查效率。本项目让我们深刻理解了嵌入式系统的软硬协同设计思想，为未来的物联网产品开发积累了宝贵经验。</p>
+
+<hr>
+
+<!-- ===== 第五部分 ===== -->
+<h2 id="p5">第五部分 参考文献</h2>
+
+<ol>
+  <li>STMicroelectronics. RM0468 Reference manual - STM32H7A3/7B3[Z]. 2024.</li>
+  <li>STMicroelectronics. UM1974 STM32 Nucleo-144 boards (MB1137)[Z]. 2023.</li>
+  <li>FreeRTOS. The FreeRTOS Kernel - Developer Documentation[EB/OL]. freertos.org</li>
+  <li>EMQX. EMQX Cloud Documentation[EB/OL]. docs.emqx.com</li>
+  <li>Sensirion. SHT3x-DIS Datasheet[Z]. 2021.</li>
+  <li>NXP. PN532/C1 NFC Controller Datasheet[Z]. 2017.</li>
+  <li>Winbond. W25Q128JV 128M-Bit Serial Flash Datasheet[Z]. 2019.</li>
+  <li>合宙通信. Air780E 4G模块AT指令手册[Z]. 2024.</li>
+  <li>中科微电子. ATGM336H GPS/北斗定位模块数据手册[Z]. 2023.</li>
+</ol>
+
+<p style="text-align:center;color:var(--dim);font-size:0.78rem;margin-top:40px;padding-bottom:32px;">
+  CargoTracker-STM32H7 ·
+  <a href="dashboard.html">云端控制台</a> ·
+  <a href="index.html">接线指南</a> ·
+  <a href="https://github.com/MashedPotato817/CargoTracker-STM32H7">GitHub</a>
+</p>
+
+</body>
+</html>
