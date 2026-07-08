@@ -189,10 +189,12 @@ function updateUI(d) {
   if (d.lon !== undefined) {
     document.getElementById('lon-val').textContent = d.lon.toFixed(4);
   }
-  if (d.gps_v !== undefined) {
+  const gpsValid = d.gps_v !== undefined ? d.gps_v : d.gps_valid;
+  if (gpsValid !== undefined) {
     const el = document.getElementById('gps-v');
-    el.textContent = d.gps_v ? 'Yes' : 'No';
-    el.style.color = d.gps_v ? 'var(--good)' : 'var(--bad)';
+    const ok = gpsValid === 1 || gpsValid === true;
+    el.textContent = ok ? 'Yes' : 'No';
+    el.style.color = ok ? 'var(--good)' : 'var(--bad)';
   }
   if (d.bat !== undefined) {
     document.getElementById('bat-val').textContent = d.bat.toFixed(2) + ' V';
