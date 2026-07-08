@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CargoTracker 云端控制台</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+:root {
+  --bg: #0a0d14; --card: #131620; --border: #1e2230;
+  --text: #9aa0b4; --head: #e0e4f0; --accent: #4da6ff;
+  --good: #34d399; --warn: #f59e0b; --bad: #ef4444;
+  --gauge-bg: #1a1e2a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; padding: 0;
+}
+/* header */
+.header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; background: var(--bg); z-index: 10;
+}
+.header h1 { font-size: 1rem; color: var(--head); font-weight: 600; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.online { background: var(--good); box-shadow: 0 0 6px var(--good); }
+.dot.offline{ background: var(--bad); }
+/* main grid */
+.main { display: grid; gap: 12px; padding: 12px; max-width: 480px; margin: 0 auto; }
+/* cards */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px;
+}
+.card h2 { font-size: 0.75rem; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+/* gauges */
+.gauges { display: flex; gap: 12px; }
+.gauge {
+  flex: 1; text-align: center; padding: 12px 8px;
+  background: var(--gauge-bg); border-radius: 8px;
+}
+.gauge .val {
+  font-size: 2rem; font-weight: 700; color: var(--head);
+  font-variant-numeric: tabular-nums;
+}
+.gauge .unit { font-size: 0.85rem; color: var(--accent); margin-left: 2px; }
+.gauge .label { font-size: 0.7rem; color: var(--dim); margin-top: 4px; }
+/* gps */
+.gps-row { display: flex; gap: 16px; }
+.gps-item { flex: 1; }
+.gps-item .label { font-size: 0.7rem; color: var(--dim); }
+.gps-item .val { font-size: 1.1rem; color: var(--head); font-family: monospace; }
+/* buttons */
+.cmds { display: flex; gap: 8px; }
+.cmd-btn {
+  flex: 1; padding: 12px 0; border: none; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  color: #fff; transition: opacity 0.15s;
+}
+.cmd-btn:active { opacity: 0.7; }
+.cmd-hold   { background: #3b82f6; }
+.cmd-return { background: #f59e0b; }
+.cmd-continue { background: #10b981; }
+/* log */
+.log { max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.72rem; line-height: 1.6; }
+.log .ts { color: var(--dim); margin-right: 8px; }
+.log .val-temp { color: #f87171; }
+.log .val-hum  { color: #60a5fa; }
+.log .val-cmd  { color: #fbbf24; }
+/* battery bar */
+.bar-wrap { height: 8px; background: var(--gauge-bg); border-radius: 4px; margin-top: 8px; }
+.bar-inner { height: 100%; border-radius: 4px; background: var(--good); transition: width 0.3s; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CargoTracker 云端控制台</h1>
+  <div class="status">
+    <span class="dot offline" id="dot"></span>
+    <span id="status-text">离线</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- 温湿度 -->
+  <div class="card">
+    <h2>实时环境</h2>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="val" id="temp-val">--</div>
+        <div class="label"><span class="unit">&deg;C</span> 温度</div>
+      </div>
+      <div class="gauge">
+        <div class="val" id="hum-val">--</div>
+        <div class="label"><span class="unit">%</span> 湿度</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GPS -->
+  <div class="card">
+    <h2>GPS 定位</h2>
+    <div class="gps-row">
+      <div class="gps-item"><div class="label">纬度</div><div class="val" id="lat-val">--</div></div>
+      <div class="gps-item"><div class="label">经度</div><div class="val" id="lon-val">--</div></div>
+      <div class="gps-item"><div class="label">有效</div><div class="val" id="gps-v">--</div></div>
+    </div>
+  </div>
+
+  <!-- 电池 -->
+  <div class="card">
+    <h2>电池</h2>
+    <div style="font-size:1.2rem;color:var(--head);" id="bat-val">-- V</div>
+    <div class="bar-wrap"><div class="bar-inner" id="bat-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- 指令 -->
+  <div class="card">
+    <h2>云端指令</h2>
+    <div class="cmds">
+      <button class="cmd-btn cmd-hold" onclick="sendCmd('HOLD')">暂留</button>
+      <button class="cmd-btn cmd-return" onclick="sendCmd('RETURN')">退货</button>
+      <button class="cmd-btn cmd-continue" onclick="sendCmd('CONTINUE')">继续运输</button>
+    </div>
+  </div>
+
+  <!-- 日志 -->
+  <div class="card">
+    <h2>数据日志</h2>
+    <div class="log" id="log"><div style="color:var(--dim)">等待设备上报...</div></div>
+  </div>
+</div>
+
+<script>
+const BROKER = 'broker.emqx.io';
+const PORT = 8084;
+const PATH = '/mqtt';
+const TOPIC_TELEM = 'cargo/telemetry';
+const TOPIC_CMD   = 'cargo/cmd';
+
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('status-text');
+const logEl = document.getElementById('log');
+
+let firstMsg = true;
+
+const client = mqtt.connect(`wss://${BROKER}:${PORT}${PATH}`, {
+  clientId: 'dashboard_' + Math.random().toString(16).slice(2, 8),
+  clean: true,
+});
+
+client.on('connect', () => {
+  dot.className = 'dot online';
+  statusText.textContent = '已连接';
+  client.subscribe(TOPIC_TELEM);
+  addLog('system', '已连接 broker.emqx.io');
+});
+
+client.on('close', () => {
+  dot.className = 'dot offline';
+  statusText.textContent = '已断开';
+});
+
+client.on('message', (topic, payload) => {
+  try {
+    const data = JSON.parse(payload.toString());
+    updateUI(data);
+    addLog('data', JSON.stringify(data));
+  } catch(e) {
+    addLog('raw', payload.toString());
+  }
+});
+
+function updateUI(d) {
+  if (d.temp !== undefined) {
+    document.getElementById('temp-val').textContent = d.temp.toFixed(1);
+  }
+  if (d.hum !== undefined) {
+    document.getElementById('hum-val').textContent = d.hum.toFixed(1);
+  }
+  if (d.lat !== undefined) {
+    document.getElementById('lat-val').textContent = d.lat.toFixed(4);
+  }
+  if (d.lon !== undefined) {
+    document.getElementById('lon-val').textContent = d.lon.toFixed(4);
+  }
+  if (d.gps_v !== undefined) {
+    const el = document.getElementById('gps-v');
+    el.textContent = d.gps_v ? 'Yes' : 'No';
+    el.style.color = d.gps_v ? 'var(--good)' : 'var(--bad)';
+  }
+  if (d.bat !== undefined) {
+    document.getElementById('bat-val').textContent = d.bat.toFixed(2) + ' V';
+    const pct = Math.min(100, Math.max(0, ((d.bat - 3.3) / (4.2 - 3.3)) * 100));
+    document.getElementById('bat-bar').style.width = pct + '%';
+  }
+}
+
+function sendCmd(cmd) {
+  client.publish(TOPIC_CMD, JSON.stringify({ cmd: cmd, ts: Math.floor(Date.now()/1000) }));
+  addLog('cmd', '下发指令: ' + cmd);
+}
+
+function addLog(type, msg) {
+  if (firstMsg) { logEl.innerHTML = ''; firstMsg = false; }
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  let cls = '';
+  if (type === 'cmd') cls = 'val-cmd';
+  const div = document.createElement('div');
+  div.innerHTML = `<span class="ts">${ts}</span><span class="${cls}">${msg}</span>`;
+  logEl.prepend(div);
+  if (logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
+}
+</script>
+</body>
+</html>

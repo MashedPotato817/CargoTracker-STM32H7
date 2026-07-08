@@ -65,25 +65,43 @@ Port:    1883 (TCP) 或 8883 (TLS)
 
 ---
 
-## Step 5: 填到代码里
+## Step 5: 开发阶段 — 使用公共 TCP Broker
 
-打开 `test1/Core/Src/air780e/mqtt.c`，把以下内容替换为真实值：
+> EMQX Cloud Serverless **仅支持 TLS(8883)**，不提供 TCP(1883)。
+> Air780E TLS 支持待确认。开发阶段先用公共 TCP broker。
 
+队友 `mqtt.c` 已配置：
 ```c
-#define MQTT_BROKER_HOST  "xxx.emqx.cloud"   // 你的 broker 地址
-#define MQTT_BROKER_PORT  1883                // TCP 端口
-#define MQTT_CLIENT_ID    "cargo_001"         // 设备唯一 ID
-#define MQTT_USERNAME     "your_username"     // EMQX 用户名
-#define MQTT_PASSWORD     "your_password"     // EMQX 密码
+#define MQTT_BROKER_HOST  "broker.emqx.io"   // 公共测试 broker
+#define MQTT_BROKER_PORT  1883               // TCP 端口
 ```
 
-B 组 `MQTT_Init()` 中的 `AT+CMQTTCONNECT` 指令会用到这些参数。
+**无需修改，零改动直接用。**
+
+## 云端查看与控制
+
+1. **自建 Web 控制台**（`dashboard.html`）：
+   - 直连 `broker.emqx.io`，实时温湿度/GPS/电池
+   - 三个指令按钮（暂留/退货/继续运输）
+   - GitHub Pages 托管，手机扫码即可
+
+2. **MQTTX Web**（备用调试）：https://mqttx.app/web-client
+
+## TLS 备用方案（答辩用）
+
+| 参数 | 值 |
+|------|-----|
+| Broker | `h8111173.ala.cn-hangzhou.emqxsl.cn` |
+| Port | `8883` (TLS) |
+| 用户名 | `CargoTracker` |
+| 密码 | `Cargo2026` |
 
 ---
 
 ## 验证清单
 
-- [ ] EMQX Cloud 部署状态为「运行中」
-- [ ] WebSocket 客户端能发消息和收消息
-- [ ] 连接参数已发给 B 组
-- [ ] `mqtt.c` 中的 broker/用户名/密码 已更新
+- [x] EMQX Cloud 部署运行中
+- [x] MQTTX Web 收发验证通过
+- [x] 公共 TCP broker 可用（队友 mqtt.c 已配置）
+- [ ] MQTTX Web 订阅 `cargo/telemetry` 实时监控
+- [ ] TLS 备用方案待 Air780E 确认

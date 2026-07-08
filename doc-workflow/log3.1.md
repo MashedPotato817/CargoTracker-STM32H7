@@ -36,8 +36,40 @@ mqtt.c 中 AT 指令需用 `tls://` 前缀而非 `tcp://`。
 
 - [x] Broker 地址已获取
 - [x] 客户端认证已创建
-- [x] WebSocket 客户端验证（MQTTX Web, 2026-07-09 00:04, testtopic/1, QoS 0. 收发成功）
+- [x] WebSocket 客户端验证（2026-07-09 00:04, MQTTX Web, testtopic/1. 收发成功）
 - [ ] 确认 Air780E AT 固件是否支持 MQTT over TLS
+
+## 开发期间：使用公共 TCP Broker
+
+EMQX Cloud Serverless 仅 TLS，Air780E TLS 支持待确认。开发阶段用公共 TCP broker：
+
+| 参数 | 值 |
+|------|-----|
+| Broker | `broker.emqx.io` |
+| Port | `1883` (TCP) |
+| 用户名/密码 | 无需（公共 broker） |
+
+> 队友 `mqtt.c` 已配置此地址，无需修改。TLS 方案保留备用，答辩时切换。
+
+## 云端查看与控制
+
+公共 broker 无控制台，替代方案：
+
+1. **MQTTX Web**（https://mqttx.app/web-client）：
+   - 连接到 `broker.emqx.io:8084/mqtt`（WebSocket）
+   - 订阅 `cargo/telemetry` → 实时看设备上报
+   - 发布到 `cargo/cmd` → 模拟云端指令下发
+
+2. **答辩时切换 EMQX Cloud**：`h8111173.ala.cn-hangzhou.emqxsl.cn:8883`（TLS）→ 有完整 Web 控制台
+
+## TLS 备用方案（答辩用）
+
+| 参数 | 值 |
+|------|-----|
+| Broker | `h8111173.ala.cn-hangzhou.emqxsl.cn` |
+| Port | `8883` (TLS) |
+| 用户名 | `CargoTracker` |
+| 密码 | `Cargo2026` |
 
 ## 认证凭据
 
