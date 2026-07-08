@@ -43,7 +43,6 @@ test1/Middlewares/
 
 # ========== 项目特定 ==========
 test/
-user-manual-pdf/
 doc-workflow/error1.md
 doc-workflow/PortReceive.md
 test1/Core/Inc/stm32h7xx_nucleo_conf.h
