@@ -21,6 +21,7 @@
 #include "i2c.h"
 
 /* USER CODE BEGIN 0 */
+#include <stdio.h>
 
 /* USER CODE END 0 */
 
@@ -166,6 +167,27 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 }
 
 /* USER CODE BEGIN 1 */
+void I2C1_DebugScan(void)
+{
+  uint8_t addr;
+  uint8_t found = 0U;
+
+  printf("[I2C1] scan start (PB8/PB9)\n");
+  for (addr = 0x03U; addr <= 0x77U; addr++) {
+    if (HAL_I2C_IsDeviceReady(&hi2c1, (uint16_t)(addr << 1), 1U, 10U) == HAL_OK) {
+      printf("[I2C1] device found at 0x%02X\n", addr);
+      found++;
+    }
+  }
+
+  if (found == 0U) {
+    printf("[I2C1] scan done: no ACK, SCL=%u, SDA=%u\n",
+           (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8),
+           (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9));
+  } else {
+    printf("[I2C1] scan done: %u device(s)\n", (unsigned int)found);
+  }
+}
 
 /* USER CODE END 1 */
 
