@@ -92,8 +92,8 @@ void App_TaskStateMachine(void)
     uint16_t cloud_value = APP_CLOUD_CMD_NONE;
     uint32_t idle_log_tick = 0U;
 
-    printf("[SM] task started, waiting 5s for Air780E...\n");
-    osDelay(5000);
+    printf("[SM] task started, waiting 10s for Air780E...\n");
+    osDelay(10000);
     StateMachine_Init();
     printf("[SM] state_machine done\n");
     Alarm_Init();
