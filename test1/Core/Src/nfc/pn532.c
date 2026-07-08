@@ -133,8 +133,10 @@ void PN532_Init(void)
 
     if (HAL_I2C_IsDeviceReady(&hi2c1, PN532_I2C_ADDR, 3U,
                               PN532_TIMEOUT_MS) != HAL_OK) {
-        printf("[PN532] not found (I2C1 PB8/PB9, addr=0x24, err=0x%08lX)\n",
-               (unsigned long)HAL_I2C_GetError(&hi2c1));
+        printf("[PN532] not found (I2C1 PB8/PB9, addr=0x24, err=0x%08lX, SCL=%u, SDA=%u)\n",
+               (unsigned long)HAL_I2C_GetError(&hi2c1),
+               (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8),
+               (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9));
         return;
     }
 
