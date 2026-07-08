@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "app/power.h"
 
 #if AIR780E_USE_HAL_UART
 #include "usart.h"
@@ -142,9 +143,9 @@ void Air780E_Init(void)
 #else
     printf("[Air780E] init start (stub AT, set AIR780E_USE_HAL_UART=1 after CubeMX enables USART1)\n");
 #endif
-    printf("[Air780E] note: PB0 PWRKEY conflict is owned by C group per TROUBLESHOOTING.md\n");
+    Power_Air780E_PowerOn();
 
-    at_ok = Air780E_SendAT("AT", "OK", 1000U);
+    at_ok = Air780E_SendAT("AT", "OK", 3000U);
     echo_ok = Air780E_SendAT("ATE0", "OK", 1000U);
     (void)Air780E_SendAT("AT+CSQ", "OK", 1000U);
     (void)Air780E_ParseSignalQuality(at_response);

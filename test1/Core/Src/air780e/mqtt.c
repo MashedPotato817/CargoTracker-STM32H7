@@ -282,7 +282,27 @@ void MQTT_Init(void)
         return;
     }
 
-    /* TODO: 解析 CONNACK（跳过，直接假设成功） */
+    /* Step 3: 读 CONNACK（broker 回 4 字节，清空以免干扰后续 CIPSEND） */
+    {
+        uint8_t drain[64] = {0};
+        uint32_t drain_pos = 0;
+        uint8_t ch;
+        uint32_t t = HAL_GetTick();
+
+        printf("[MQTT] waiting CONNACK...\n");
+        while ((HAL_GetTick() - t) < 2000U) {
+            if (HAL_UART_Receive(&huart1, &ch, 1U, 10U) == HAL_OK) {
+                if (drain_pos < sizeof(drain) - 1U) {
+                    drain[drain_pos++] = ch;
+                    drain[drain_pos] = '\0';
+                }
+            }
+            /* 收到 4+ 字节 CONNACK 就停 */
+            if (drain_pos >= 4U) break;
+        }
+        printf("[MQTT] CONNACK drain: %lu bytes\n", (unsigned long)drain_pos);
+    }
+
     mqtt_ready = 1U;
     printf("[MQTT] init OK (TCP MQTT, %s:%u)\n", MQTT_BROKER_HOST, MQTT_BROKER_PORT);
 #else

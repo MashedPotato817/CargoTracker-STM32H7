@@ -19,7 +19,11 @@ void Alarm_Init(void)
     led_on = 0;
     last_toggle_tick = 0;
     HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_RESET);
-    printf("[Alarm] init OK (LD2 yellow heartbeat/alarm, buzzer stub)\n");
+#ifdef BUZZER_Pin
+    /* 蜂鸣器接法: 3.3V -- 蜂鸣器 -- PC8，HIGH=关 LOW=响 */
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+#endif
+    printf("[Alarm] init OK (LD2 yellow heartbeat, buzzer PC8)\n");
 }
 
 uint8_t Alarm_CheckEnv(const EnvSample *env)
@@ -48,6 +52,11 @@ void Alarm_Task(void)
         HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port,
                           LD2_YELLOW_Pin,
                           led_on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+#ifdef BUZZER_Pin
+        /* 3.3V--蜂鸣器--PC8: LOW=响 HIGH=关 */
+        HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin,
+                          (alarm_active && led_on) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+#endif
     }
 
     if (last_reported != alarm_active) {
