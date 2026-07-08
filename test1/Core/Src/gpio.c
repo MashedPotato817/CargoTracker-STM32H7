@@ -60,7 +60,8 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, AIR780E_PWRKEY_Pin, GPIO_PIN_SET);  /* PWRKEY HIGH=开机 */
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, BUZZER_Pin|ALARM_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, ALARM_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, BUZZER_Pin, GPIO_PIN_SET);  /* HIGH=关(3.3V-蜂鸣器-PC8) */
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_RESET);

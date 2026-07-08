@@ -159,7 +159,9 @@ void Air780E_Init(void)
     (void)Air780E_SendAT("AT+CGDCONT=1,\"IP\",\"cmnet\"", "OK", 1000U);
     attached_ok = Air780E_SendAT("AT+CGATT?", "+CGATT: 1", 1000U);
 
-    network_ready = ((at_ok != 0U) && (echo_ok != 0U) && (registered_ok != 0U) && (attached_ok != 0U)) ? 1U : 0U;
+    /* AT 可能超时（模块刚启动），以注册状态为准 */
+    (void)at_ok;
+    network_ready = ((echo_ok != 0U) && (registered_ok != 0U) && (attached_ok != 0U)) ? 1U : 0U;
 
     printf("[Air780E] init %s, CSQ=%u\n", (network_ready != 0U) ? "ready" : "not ready", signal_quality);
 }

@@ -13,7 +13,7 @@
 #define MQTT_BROKER_PORT    1883
 #define MQTT_CLIENT_ID      "stm32_cargo_001"
 #define MQTT_TOPIC_TELEM    "cargo/telemetry"
-#define MQTT_TOPIC_CMD      "cargo/command"
+#define MQTT_TOPIC_CMD      "cargo/cmd"
 /* ----------------------------------------- */
 
 #define MQTT_PAYLOAD_MAX     256U
