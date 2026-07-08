@@ -38,6 +38,7 @@ CargoTracker-STM32H7/
 ├── README.md                      # 本文件
 ├── index.html                     # 硬件接线指南（GitHub Pages）
 ├── dashboard.html                 # 云端控制台（MQTT 实时监控+指令下发）
+├── report.html                    # 设计报告（GitHub Pages 在线阅读）
 ├── doc/                           # 设计文档
 │   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录
 │   ├── STM32H7_CubeMX_Config.md   # CubeMX 配置
