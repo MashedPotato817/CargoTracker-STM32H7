@@ -80,6 +80,13 @@ static uint8_t sht31_update_sample(void)
 void SHT31_Init(void)
 {
 #if SHT31_USE_HAL_I2C
+    if (HAL_I2C_IsDeviceReady(&hi2c1, SHT31_I2C_ADDR, 3U,
+                              SHT31_I2C_TIMEOUT_MS) != HAL_OK) {
+        printf("[SHT31] not found (I2C1 PB8/PB9, addr=0x44, err=0x%08lX)\n",
+               (unsigned long)HAL_I2C_GetError(&hi2c1));
+        return;
+    }
+
     if (sht31_update_sample() != 0U) {
         printf("[SHT31] init OK (I2C1 PB8/PB9, addr=0x44)\n");
     } else {

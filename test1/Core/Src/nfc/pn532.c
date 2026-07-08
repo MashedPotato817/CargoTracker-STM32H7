@@ -14,9 +14,27 @@
 #define PN532_CMD_INLIST      0x4AU
 #define PN532_STATUS_READY    0x01U
 #define PN532_TIMEOUT_MS      100U
+#define PN532_READY_RETRIES   20U
 #define PN532_FRAME_MAX       32U
 
 #if PN532_USE_HAL_I2C
+static uint8_t pn532_read_ready_frame(uint8_t *frame, uint16_t frame_size)
+{
+    uint8_t retry;
+
+    for (retry = 0U; retry < PN532_READY_RETRIES; retry++) {
+        if ((HAL_I2C_Master_Receive(&hi2c1, PN532_I2C_ADDR, frame, frame_size,
+                                    PN532_TIMEOUT_MS) == HAL_OK) &&
+            (frame[0] == PN532_STATUS_READY)) {
+            return 1U;
+        }
+
+        HAL_Delay(5U);
+    }
+
+    return 0U;
+}
+
 static uint8_t pn532_write_command(const uint8_t *cmd, uint8_t cmd_len)
 {
     uint8_t frame[PN532_FRAME_MAX] = {0};
@@ -48,6 +66,25 @@ static uint8_t pn532_write_command(const uint8_t *cmd, uint8_t cmd_len)
                                     PN532_TIMEOUT_MS) == HAL_OK) ? 1U : 0U;
 }
 
+static uint8_t pn532_read_ack(void)
+{
+    uint8_t frame[7] = {0};
+
+    if (pn532_read_ready_frame(frame, sizeof(frame)) == 0U) {
+        return 0U;
+    }
+
+    return ((frame[1] == 0x00U) && (frame[2] == 0x00U) &&
+            (frame[3] == 0xFFU) && (frame[4] == 0x00U) &&
+            (frame[5] == 0xFFU) && (frame[6] == 0x00U)) ? 1U : 0U;
+}
+
+static uint8_t pn532_send_command(const uint8_t *cmd, uint8_t cmd_len)
+{
+    return ((pn532_write_command(cmd, cmd_len) != 0U) &&
+            (pn532_read_ack() != 0U)) ? 1U : 0U;
+}
+
 static uint8_t pn532_read_response(uint8_t expected_cmd, uint8_t *payload,
                                    uint8_t payload_size, uint8_t *payload_len)
 {
@@ -55,8 +92,7 @@ static uint8_t pn532_read_response(uint8_t expected_cmd, uint8_t *payload,
     uint8_t len;
     uint8_t i;
 
-    if (HAL_I2C_Master_Receive(&hi2c1, PN532_I2C_ADDR, frame, sizeof(frame),
-                               PN532_TIMEOUT_MS) != HAL_OK) {
+    if (pn532_read_ready_frame(frame, sizeof(frame)) == 0U) {
         return 0U;
     }
 
@@ -95,7 +131,14 @@ void PN532_Init(void)
     uint8_t payload[4] = {0};
     uint8_t payload_len = 0U;
 
-    if ((pn532_write_command(cmd, sizeof(cmd)) != 0U) &&
+    if (HAL_I2C_IsDeviceReady(&hi2c1, PN532_I2C_ADDR, 3U,
+                              PN532_TIMEOUT_MS) != HAL_OK) {
+        printf("[PN532] not found (I2C1 PB8/PB9, addr=0x24, err=0x%08lX)\n",
+               (unsigned long)HAL_I2C_GetError(&hi2c1));
+        return;
+    }
+
+    if ((pn532_send_command(cmd, sizeof(cmd)) != 0U) &&
         (pn532_read_response(PN532_CMD_SAM_CONFIG, payload, sizeof(payload),
                              &payload_len) != 0U)) {
         printf("[PN532] init OK (I2C1 PB8/PB9, addr=0x24)\n");
@@ -121,7 +164,7 @@ uint8_t PN532_ReadCard(char *uid, uint32_t uid_size)
         return 0U;
     }
 
-    if ((pn532_write_command(cmd, sizeof(cmd)) == 0U) ||
+    if ((pn532_send_command(cmd, sizeof(cmd)) == 0U) ||
         (pn532_read_response(PN532_CMD_INLIST, payload, sizeof(payload),
                              &payload_len) == 0U)) {
         return 0U;
