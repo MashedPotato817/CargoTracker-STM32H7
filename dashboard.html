@@ -112,11 +112,19 @@ body {
     </div>
   </div>
 
-  <!-- 电池 -->
+  <!-- 信号 + 最后上报 -->
   <div class="card">
-    <h2>电池</h2>
-    <div style="font-size:1.2rem;color:var(--head);" id="bat-val">-- V</div>
-    <div class="bar-wrap"><div class="bar-inner" id="bat-bar" style="width:0%"></div></div>
+    <h2>连接状态</h2>
+    <div style="display:flex;gap:16px;align-items:center">
+      <div style="flex:1">
+        <div style="font-size:0.7rem;color:var(--dim)">4G 信号</div>
+        <div style="font-size:1.5rem;color:var(--head);font-weight:700" id="csq-val">--</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:0.7rem;color:var(--dim)">最后上报</div>
+        <div style="font-size:1.1rem;color:var(--head)" id="last-seen">--</div>
+      </div>
+    </div>
   </div>
 
   <!-- 指令 -->
@@ -148,6 +156,14 @@ const statusText = document.getElementById('status-text');
 const logEl = document.getElementById('log');
 
 let firstMsg = true;
+let lastTs = 0;
+setInterval(() => {
+  if (lastTs > 0) {
+    const sec = Math.floor((Date.now() - lastTs) / 1000);
+    const min = Math.floor(sec / 60);
+    document.getElementById('last-seen').textContent = sec < 60 ? sec + 's 前' : min + 'm' + (sec % 60) + 's 前';
+  }
+}, 2000);
 
 const client = mqtt.connect(`wss://${BROKER}:${PORT}${PATH}`, {
   clientId: 'dashboard_' + Math.random().toString(16).slice(2, 8),
@@ -196,11 +212,14 @@ function updateUI(d) {
     el.textContent = ok ? 'Yes' : 'No';
     el.style.color = ok ? 'var(--good)' : 'var(--bad)';
   }
-  if (d.bat !== undefined) {
-    document.getElementById('bat-val').textContent = d.bat.toFixed(2) + ' V';
-    const pct = Math.min(100, Math.max(0, ((d.bat - 3.3) / (4.2 - 3.3)) * 100));
-    document.getElementById('bat-bar').style.width = pct + '%';
+  if (d.csq !== undefined) {
+    const csq = d.csq;
+    const el = document.getElementById('csq-val');
+    el.textContent = csq;
+    el.style.color = csq >= 20 ? 'var(--good)' : csq >= 10 ? 'var(--warn)' : 'var(--bad)';
   }
+  lastTs = Date.now();
+  document.getElementById('last-seen').textContent = '刚刚';
 }
 
 function sendCmd(cmd) {
