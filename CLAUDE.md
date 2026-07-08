@@ -19,7 +19,7 @@ STM32H7A3ZI-Q 智能货物追踪物联网系统。GPS + NFC + SHT31 温湿度 + 
 | 外设 | 引脚 | 备注 |
 |------|------|------|
 | USART1 (Air780E) | PA9 TX, PA10 RX | 115200 baud |
-| USART1 PWRKEY | PB0 GPIO_Output | ⚠️ 仍为 LD1_GREEN 心跳灯，待 C 组 Task 2.6 解决 |
+| USART1 PWRKEY | PB0 GPIO_Output | AIR780E_PWRKEY，默认 HIGH 释放；低电平表示按下 |
 | USART2 (GPS) | PD5 TX, PD6 RX | 115200 baud（GPS_Init 运行时重配 9600） |
 | I2C1 (SHT31/PN532) | PB8 SCL, PB9 SDA | 400kHz, 共享总线 |
 | SPI1 (W25Q128) | PA4 CS, PA5 SCK, PA6 MISO, PA7 MOSI | 10~20MHz |

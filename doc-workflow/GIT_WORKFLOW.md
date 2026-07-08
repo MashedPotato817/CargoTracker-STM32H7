@@ -6,7 +6,7 @@
 
 ```
 main                       ← 始终可编译可烧录，保护分支（W 已合并：I2C/SPI/USART HAL）
-  ├── feat/pb0-fix         ← C: PB0 冲突解决（当前阻塞项）
+  ├── feat/pb0-fix         ← C: PB0 冲突已解除，待硬件验证
   ├── feat/integration     ← C: 系统集成 + 状态机
   ├── feat/sht31-verify    ← 待接线验证
   ├── feat/pn532-verify    ← 待接线验证

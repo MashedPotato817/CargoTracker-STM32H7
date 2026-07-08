@@ -165,14 +165,21 @@ Size  : 0x00010000
 
 ### 10. PB0 引脚冲突：LD1_GREEN vs Air780E PWRKEY
 
-**现象**：硬件到齐后发现 PB0 同时用于心跳灯（LD1_GREEN）和 Air780E 4G 模块电源控制（PWRKEY）。
+**现象**：硬件到齐后发现 PB0 同时用于心跳灯（LD1_GREEN）和 Air780E 4G 模块电源控制（PWRKEY）。如果 CubeMX 生成的 `gpio.c` 仍把 PB0 和 LED 一起初始化为 LOW，Air780E 所有 AT 指令会 timeout，模块完全无响应。
 
-**原因**：stub 阶段 PB0 被配置为 LD1_GREEN 指示灯，但设计文档中 PB0 是 Air780E PWRKEY。
+**原因**：stub 阶段 PB0 被配置为 LD1_GREEN 指示灯，但设计文档中 PB0 是 Air780E PWRKEY。LED 的 LOW 可能表示熄灭，但 PWRKEY 的 LOW 表示按下/拉到 GND；持续 LOW 会让 Air780E 保持关机。
 
 **解决**：
 1. 心跳灯迁移到 PE1（LD2_YELLOW），通过不同闪烁模式区分心跳（慢闪）和报警（快闪）
 2. PB0 释放为 Air780E PWRKEY（GPIO_Output）
 3. C 组负责统一修改 CubeMX 并协调 A/B 组
+
+`gpio.c` 初始电平必须分开写，PWRKEY 默认释放为 HIGH：
+
+```c
+HAL_GPIO_WritePin(GPIOB, LD3_RED_Pin, GPIO_PIN_RESET);
+HAL_GPIO_WritePin(GPIOB, AIR780E_PWRKEY_Pin, GPIO_PIN_SET);
+```
 
 > 注意：此变更必须由 C 组统一操作，A/B 组禁止单独使用 PB0。
 

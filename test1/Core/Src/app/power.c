@@ -20,23 +20,27 @@ void Power_EnterStopStub(void)
 
 void Power_Air780E_PowerOn(void)
 {
-    /* Air780E 上电自动开机，不碰 PWRKEY */
-    printf("[Power] Air780E VBAT auto-start (PWRKEY untouched)\n");
+    Power_Air780E_SetPwrKey(0);
+    printf("[Power] Air780E PWRKEY released for VBAT auto-start\n");
 }
 
 void Power_Air780E_PowerOff(void)
 {
 #if defined(AIR780E_PWRKEY_GPIO_Port) && defined(AIR780E_PWRKEY_Pin)
     printf("[Power] Air780E power-off (PWRKEY low 1.5s)\n");
-    HAL_GPIO_WritePin(AIR780E_PWRKEY_GPIO_Port, AIR780E_PWRKEY_Pin, GPIO_PIN_RESET);
+    Power_Air780E_SetPwrKey(1);
     HAL_Delay(1500);
-    HAL_GPIO_WritePin(AIR780E_PWRKEY_GPIO_Port, AIR780E_PWRKEY_Pin, GPIO_PIN_SET);
+    Power_Air780E_SetPwrKey(0);
 #endif
 }
 
 void Power_Air780E_SetPwrKey(uint8_t active)
 {
 #if defined(AIR780E_PWRKEY_GPIO_Port) && defined(AIR780E_PWRKEY_Pin)
+    HAL_GPIO_WritePin(AIR780E_PWRKEY_GPIO_Port,
+                      AIR780E_PWRKEY_Pin,
+                      (active != 0U) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+#else
     (void)active;
 #endif
 }

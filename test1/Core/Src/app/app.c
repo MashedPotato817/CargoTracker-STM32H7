@@ -153,7 +153,7 @@ void App_TaskStateMachine(void)
         }
 
         StateMachine_Set(STATE_UPLOAD);
-        Power_Air780E_SetPwrKey(1);
+        Power_Air780E_SetPwrKey(0);
         HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
         if (MQTT_PublishTelemetry(&telemetry) == 0U) {
             (void)W25Q128_WriteTelemetry(&telemetry);

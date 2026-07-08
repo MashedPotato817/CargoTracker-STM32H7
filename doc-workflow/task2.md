@@ -98,13 +98,13 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ## Task 2.5: USART1 驱动验证（Air780E 4G + MQTT）
 
-**负责人：B** | 代码：✅ 完成 | ⛔ 阻塞：Task 2.6（PB0 PWRKEY 未解决）
+**负责人：B** | 代码：✅ 完成 | ⚠️ 待硬件验证：PB0 PWRKEY 已释放为 HIGH
 
 - [x] `AIR780E_USE_HAL_UART = 1`（已配置）
 - [x] HAL UART 真 AT 命令发送/接收/超时（已实现）
 - [x] `AT+CREG?` 同时接受 0,1（本地）和 0,5（漫游）注册
 - [x] MQTT 真 UART 路径（已实现）
-- [ ] **前置**：PB0 释放为 Air780E PWRKEY（Task 2.6）
+- [x] **前置**：PB0 释放为 Air780E PWRKEY，默认 HIGH（释放/开机）
 - [ ] 连接 Air780E 到 USART1（PA9 TX, PA10 RX）、独立 4.0V 供电
 - [ ] AT 指令序列验证：AT → ATE0 → AT+CSQ → AT+CREG? → AT+CGATT?
 - [ ] MQTT 验证（需 SIM 卡 + 云平台配置）
@@ -119,11 +119,11 @@ git commit -m "pre-cube: 外设使能前快照"
 - [x] CubeMX：PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
 - [x] CubeMX：心跳保持 PE1（LD2_YELLOW）不变
 - [x] `main.h`：自动生成 `AIR780E_PWRKEY_Pin/Port` 宏
-- [ ] `power.c`：pwrkey 时序实现（>1s 低脉冲开关机）
+- [x] `power.c`：PWRKEY 低有效按下、默认 HIGH 释放，关机使用 1.5s 低脉冲
 - [ ] `alarm.c`：启用 PC8 蜂鸣器 + PC9 外接 LED（引脚已配置）
 - [ ] Keil 编译 0 Error 0 Warning
 - [ ] 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
-- [ ] 通知 B 组 PB0 已可用 → 解除 2.5 阻塞
+- [x] 通知 B 组 PB0 已可用 → 解除 2.5 阻塞
 
 ---
 
@@ -166,7 +166,7 @@ git commit -m "pre-cube: 外设使能前快照"
 | `test1/Core/Src/air780e/air780e.c` | 修改（USART1 替代 stub） | B | ✅ 代码完成 |
 | `test1/Core/Src/air780e/mqtt.c` | 修改（真实 AT 交互） | B | ✅ 代码完成 |
 | `test1/Core/Src/app/alarm.c` | 修改（PC8蜂鸣器+PC9 LED） | C | 🔧 待实现 |
-| `test1/Core/Src/app/power.c` | 修改（PWRKEY 时序） | C | 🔧 待实现 |
+| `test1/Core/Src/app/power.c` | 修改（PWRKEY 时序） | C | ✅ 已完成 |
 | `test1/Core/Inc/main.h` | 补充引脚宏 | C | ✅ 已完成 |
 | `test1/Core/Inc/usart.h` | 补充 huart1/2 声明 | C | ✅ 已完成 |
 | `test1/Core/Src/usart.c` | 补充 USART1/2 初始化 | C | ✅ 已完成 |
