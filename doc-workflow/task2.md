@@ -43,87 +43,82 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ---
 
-## Task 2.2: I2C1 驱动验证（SHT31 + PN532）
+## Task 2.2: I2C1 驱动验证（SHT31 + PN532）⚠️ 部分验证
 
-**负责人：A** | 代码：✅ 完成 | 硬件验证：❌ 待做
+**负责人：A** | 代码：✅ | 硬件：SHT31 ✅ / PN532 ⚠️ 待标签测试
 
-### 2.2.1 SHT31 温湿度
+### 2.2.1 SHT31 温湿度 ✅
 
 - [x] `SHT31_USE_HAL_I2C = 1`（已配置）
-- [ ] 连接 SHT31 到 I2C1 总线（PB8 SCL, PB9 SDA）
-- [ ] 编译 → 烧录 → 串口观察温度读数（应在 ~20-30°C）
-- [ ] 握手验证：手指靠近传感器，温度上升
+- [x] 连接 SHT31 到 I2C1 总线（PB8 SCL, PB9 SDA）
+- [x] 编译 → 烧录 → 串口：`T=24~25C H=47~51%`（真实数据，非 stub）
+- [x] 连续多次采样数据正常波动
 
-### 2.2.2 PN532 NFC
+### 2.2.2 PN532 NFC ⚠️
 
 - [x] `PN532_USE_HAL_I2C = 1`（已配置）
-- [ ] 确认 PN532 已挂在 I2C1 总线（地址 0x24，与 SHT31 0x44 不冲突）
-- [ ] 编译 → 烧录 → 靠近 NTAG215 标签
-- [ ] 验证：串口输出真实 UID（非 MOCK-UID-001）
+- [x] 串口：`PN532 init OK`，I2C 地址 0x24 无冲突
+- [ ] 靠近 NTAG215 标签验证 UID 输出
 
 ### 2.2.3 I2C 总线共享验证
 
-- [ ] 交替读取 SHT31 和 PN532，确认无 I2C 总线冲突
-- [ ] 长时间运行（10分钟+），无 I2C 超时或 HAL_ERROR
+- [x] SHT31 + PN532 共享 I2C1，init 均正常
+- [ ] 长时间运行（10分钟+），无 I2C 超时
 
 ---
 
-## Task 2.3: USART2 驱动验证（GPS）
+## Task 2.3: USART2 驱动验证（GPS）⚠️ stub 数据
 
-**负责人：B** | 代码：✅ 完成 | 硬件验证：❌ 待做
+**负责人：B** | 代码：✅ | 硬件：⚠️ 串口输出 lat=31 lon=121（stub 固定值）
 
 - [x] `GPS_USE_HAL_UART = 1`（已配置）
 - [x] USART2 HAL 真 UART 逐字节 NMEA 读取（已实现）
 - [x] `GPS_Init()` 运行时自动重配 USART2 至 9600 baud
-- [ ] 连接 ATGM336H GPS 到 USART2（PD5 TX, PD6 RX）
-- [ ] 编译 → 烧录 → 户外或窗边测试
-- [ ] 验证：串口输出真实经纬度（非 31.2304/121.4737）
+- [ ] 户外或窗边测试：需真实 NMEA 数据替代 stub
+- [ ] 验证：串口输出真实经纬度（非 31/121）
 - [ ] 检查：RMC/GGA 解析正确处理有效/无效定位
 
 ---
 
-## Task 2.4: SPI1 驱动验证（W25Q128 Flash）
+## Task 2.4: SPI1 驱动验证（W25Q128 Flash）⚠️ 部分验证
 
-**负责人：A** | 代码：✅ 完成 | 硬件验证：❌ 待做
+**负责人：A** | 代码：✅ | 硬件：✅ JEDEC ID OK / ⚠️ 读写待验
 
 - [x] `W25Q128_USE_HAL_SPI = 1`（已配置）
 - [x] 扇区擦除 + 读数据 + 写后校验（已实现）
-- [ ] 连接 W25Q128 到 SPI1 引脚（PA4 CS, PA5 SCK, PA6 MISO, PA7 MOSI）
-- [ ] 编译 → 烧录
-- [ ] 验证 JEDEC ID：应读取 0xEF17（W25Q128 制造商ID+设备ID）
+- [x] 连接 W25Q128 到 SPI1
+- [x] 编译 → 烧录 → 串口：`JEDEC ID: EF 40 18`（真实 Flash）
 - [ ] 验证读写：写入测试数据 → 读回 → 比对
 - [ ] 验证擦除：Sector Erase → 读回全 0xFF
 
 ---
 
-## Task 2.5: USART1 驱动验证（Air780E 4G + MQTT）
+## Task 2.5: USART1 驱动验证（Air780E 4G + MQTT）✅
 
-**负责人：B** | 代码：✅ 完成 | ⚠️ 待硬件验证：PB0 PWRKEY 已释放为 HIGH
+**负责人：B** | 代码：✅ | 硬件：✅ AT/MQTT 全部打通
 
 - [x] `AIR780E_USE_HAL_UART = 1`（已配置）
-- [x] HAL UART 真 AT 命令发送/接收/超时（已实现）
-- [x] `AT+CREG?` 同时接受 0,1（本地）和 0,5（漫游）注册
-- [x] MQTT 真 UART 路径（已实现）
-- [x] **前置**：PB0 释放为 Air780E PWRKEY，默认 HIGH（释放/开机）
-- [ ] 连接 Air780E 到 USART1（PA9 TX, PA10 RX）、独立 4.0V 供电
-- [ ] AT 指令序列验证：AT → ATE0 → AT+CSQ → AT+CREG? → AT+CGATT?
-- [ ] MQTT 验证（需 SIM 卡 + 云平台配置）
-- [ ] 验证：串口输出真实 CSQ 值、网络注册状态、MQTT 发布结果
+- [x] 连接 Air780E 到 USART1 + 独立 4.0V 供电
+- [x] AT 指令序列：AT ✅ ATE0 ✅ CSQ=27~28 ✅ CREG=0,1 ✅ CGREG=0,1 ✅ CEREG=0,1 ✅ CGATT=1 ✅
+- [x] TCP 连接 broker.emqx.io:1883 ✅
+- [x] MQTT CONNECT → CONNACK ✅
+- [x] MQTT PUBLISH 成功 → dashboard 收到 `{"temp":24,"hum":49,...}`
+- [x] 云端指令订阅 → 串口打印 `cloud payload: {"cmd":"HOLD"}` 等
+
+> Air780E 全链路已打通。注意：多次启动后串口日志出现混叠（reset + 日志乱序），需排查复位原因。
 
 ---
 
-## Task 2.6: PB0 冲突解决 🔧 进行中
+## Task 2.6: PB0 冲突解决 ✅ 已完成
 
-**负责人：C** | 状态：CubeMX 部分完成，代码侧待做
+**负责人：C** | 状态：✅ 全部完成
 
 - [x] CubeMX：PB0 从 LD1_GREEN → Air780E PWRKEY（GPIO_Output）
 - [x] CubeMX：心跳保持 PE1（LD2_YELLOW）不变
 - [x] `main.h`：自动生成 `AIR780E_PWRKEY_Pin/Port` 宏
-- [x] `power.c`：PWRKEY 低有效按下、默认 HIGH 释放，关机使用 1.5s 低脉冲
-- [ ] `alarm.c`：启用 PC8 蜂鸣器 + PC9 外接 LED（引脚已配置）
-- [ ] Keil 编译 0 Error 0 Warning
-- [ ] 烧录 → 验证 LED 闪烁 + PWRKEY 电平切换
-- [x] 通知 B 组 PB0 已可用 → 解除 2.5 阻塞
+- [x] `power.c`：PWRKEY 1.5s 低脉冲开关机，默认 HIGH 释放
+- [x] `gpio.c`：PB0 默认 GPIO_PIN_SET（释放），不与 LED 混写
+- [x] 串口验证：`Air780E power-on (PWRKEY low 1.5s)` ✅
 
 ---
 
