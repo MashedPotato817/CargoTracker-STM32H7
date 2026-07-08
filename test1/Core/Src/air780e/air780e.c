@@ -61,6 +61,10 @@ static uint8_t Air780E_SendAT(const char *command, const char *expected, uint32_
         response = "+CSQ: 25,99\r\nOK";
     } else if (strcmp(command, "AT+CREG?") == 0) {
         response = "+CREG: 0,1\r\nOK";
+    } else if (strcmp(command, "AT+CGREG?") == 0) {
+        response = "+CGREG: 0,1\r\nOK";
+    } else if (strcmp(command, "AT+CEREG?") == 0) {
+        response = "+CEREG: 0,1\r\nOK";
     } else if (strcmp(command, "AT+CGATT?") == 0) {
         response = "+CGATT: 1\r\nOK";
     }
@@ -94,13 +98,29 @@ static uint8_t Air780E_ParseSignalQuality(const char *response)
     return 1U;
 }
 
-static uint8_t Air780E_IsRegistered(const char *response)
+static uint8_t Air780E_IsRegistered(const char *response, const char *prefix)
 {
-    if (strstr(response, "+CREG: 0,1") != NULL) {
-        return 1U;
+    const char *line = strstr(response, prefix);
+    const char *fields;
+    int mode = 0;
+    int status = 0;
+
+    if (line == NULL) {
+        return 0U;
     }
 
-    if (strstr(response, "+CREG: 0,5") != NULL) {
+    fields = strchr(line, ':');
+    if (fields == NULL) {
+        return 0U;
+    }
+
+    if (sscanf(fields + 1, " %d,%d", &mode, &status) != 2) {
+        return 0U;
+    }
+
+    (void)mode;
+
+    if ((status == 1) || (status == 5)) {
         return 1U;
     }
 
@@ -112,6 +132,9 @@ void Air780E_Init(void)
     uint8_t at_ok;
     uint8_t echo_ok;
     uint8_t creg_ok;
+    uint8_t cgreg_ok;
+    uint8_t cereg_ok;
+    uint8_t registered_ok;
     uint8_t attached_ok;
 
 #if AIR780E_USE_HAL_UART
@@ -125,11 +148,17 @@ void Air780E_Init(void)
     echo_ok = Air780E_SendAT("ATE0", "OK", 1000U);
     (void)Air780E_SendAT("AT+CSQ", "OK", 1000U);
     (void)Air780E_ParseSignalQuality(at_response);
-    creg_ok = Air780E_SendAT("AT+CREG?", "+CREG:", 1000U);
-    creg_ok = ((creg_ok != 0U) && (Air780E_IsRegistered(at_response) != 0U)) ? 1U : 0U;
+    creg_ok = Air780E_SendAT("AT+CREG?", "OK", 2000U);
+    creg_ok = ((creg_ok != 0U) && (Air780E_IsRegistered(at_response, "+CREG:") != 0U)) ? 1U : 0U;
+    cgreg_ok = Air780E_SendAT("AT+CGREG?", "OK", 2000U);
+    cgreg_ok = ((cgreg_ok != 0U) && (Air780E_IsRegistered(at_response, "+CGREG:") != 0U)) ? 1U : 0U;
+    cereg_ok = Air780E_SendAT("AT+CEREG?", "OK", 2000U);
+    cereg_ok = ((cereg_ok != 0U) && (Air780E_IsRegistered(at_response, "+CEREG:") != 0U)) ? 1U : 0U;
+    registered_ok = ((creg_ok != 0U) || (cgreg_ok != 0U) || (cereg_ok != 0U)) ? 1U : 0U;
+    (void)Air780E_SendAT("AT+CGDCONT=1,\"IP\",\"cmnet\"", "OK", 1000U);
     attached_ok = Air780E_SendAT("AT+CGATT?", "+CGATT: 1", 1000U);
 
-    network_ready = ((at_ok != 0U) && (echo_ok != 0U) && (creg_ok != 0U) && (attached_ok != 0U)) ? 1U : 0U;
+    network_ready = ((at_ok != 0U) && (echo_ok != 0U) && (registered_ok != 0U) && (attached_ok != 0U)) ? 1U : 0U;
 
     printf("[Air780E] init %s, CSQ=%u\n", (network_ready != 0U) ? "ready" : "not ready", signal_quality);
 }
