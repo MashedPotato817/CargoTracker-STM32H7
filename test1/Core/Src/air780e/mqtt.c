@@ -303,6 +303,19 @@ void MQTT_Init(void)
         printf("[MQTT] CONNACK drain: %lu bytes\n", (unsigned long)drain_pos);
     }
 
+    /* Step 4: 订阅云端指令 topic */
+    {
+        const uint8_t sub[] = {
+            0x82, 0x0E,
+            0x00, 0x01,
+            0x00, 0x09,
+            'c', 'a', 'r', 'g', 'o', '/', 'c', 'm', 'd',
+            0x00
+        };
+        TCP_SendBinary((uint8_t *)sub, sizeof(sub));
+        printf("[MQTT] subscribed %s\n", MQTT_TOPIC_CMD);
+    }
+
     mqtt_ready = 1U;
     printf("[MQTT] init OK (TCP MQTT, %s:%u)\n", MQTT_BROKER_HOST, MQTT_BROKER_PORT);
 #else
@@ -335,29 +348,66 @@ uint8_t MQTT_PublishTelemetry(const TelemetryData *telemetry)
 
 AppCloudCommand MQTT_PollCommand(void)
 {
-    static uint32_t poll_count = 0;
-    const char *payload = "";
-
 #if AIR780E_USE_HAL_UART
+    char cmd[48];
+    uint8_t ch;
+    char rx[512] = {0};
+    uint32_t pos = 0;
+    uint32_t t;
+
     if ((Air780E_IsNetworkReady() == 0U) || (mqtt_ready == 0U)) {
         return APP_CLOUD_CMD_NONE;
     }
+
+    /* 用 AT+CIPRXGET=2 查询 TCP 接收缓冲区 */
+    (void)snprintf(cmd, sizeof(cmd), "AT+CIPRXGET=2,256");
+    if (TCP_SendAT(cmd, "+CIPRXGET:", 2000U) == 0U) {
+        /* AT+CIPRXGET 不支持时 fallback 到 stub */
+        goto fallback;
+    }
+
+    /* 读 CIPRXGET 返回的十六进制数据 */
+    t = HAL_GetTick();
+    while ((HAL_GetTick() - t) < 1000U) {
+        if (HAL_UART_Receive(&huart1, &ch, 1U, 10U) == HAL_OK) {
+            if (pos < sizeof(rx) - 1U) {
+                rx[pos++] = (char)ch;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if (pos > 0) {
+        printf("[MQTT] rx: %s\n", rx);
+        /* 直接在原始数据中搜索 cmd */
+        if (strstr(rx, "HOLD") != NULL)      return APP_CLOUD_CMD_HOLD;
+        if (strstr(rx, "RETURN") != NULL)    return APP_CLOUD_CMD_RETURN;
+        if (strstr(rx, "CONTINUE") != NULL)  return APP_CLOUD_CMD_CONTINUE;
+    }
+
+    return APP_CLOUD_CMD_NONE;
+
+fallback:
 #endif
+    /* 备用：轮转 stub（开发调试用） */
+    {
+        static uint32_t poll_count = 0;
+        const char *payload = "";
 
-    poll_count++;
-    if ((poll_count % 9U) == 0U) {
-        payload = "{\"cmd\":\"RETURN\"}";
-    } else if ((poll_count % 6U) == 0U) {
-        payload = "{\"cmd\":\"HOLD\"}";
-    } else if ((poll_count % 3U) == 0U) {
-        payload = "{\"cmd\":\"CONTINUE\"}";
+        poll_count++;
+        if ((poll_count % 9U) == 0U) {
+            payload = "{\"cmd\":\"RETURN\"}";
+        } else if ((poll_count % 6U) == 0U) {
+            payload = "{\"cmd\":\"HOLD\"}";
+        } else if ((poll_count % 3U) == 0U) {
+            payload = "{\"cmd\":\"CONTINUE\"}";
+        }
+
+        if (payload[0] != '\0') {
+            printf("[MQTT] cloud payload (stub): %s\n", payload);
+            return MQTT_ParseCommandPayload(payload);
+        }
     }
-
-    if (payload[0] != '\0') {
-        AppCloudCommand command = MQTT_ParseCommandPayload(payload);
-        printf("[MQTT] cloud payload: %s\n", payload);
-        return command;
-    }
-
     return APP_CLOUD_CMD_NONE;
 }
