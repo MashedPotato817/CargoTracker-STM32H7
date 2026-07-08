@@ -90,6 +90,7 @@ void App_TaskStateMachine(void)
 {
     uint16_t activation_event = 0;
     uint16_t cloud_value = APP_CLOUD_CMD_NONE;
+    uint32_t idle_log_tick = 0U;
 
     StateMachine_Init();
     Alarm_Init();
@@ -97,6 +98,12 @@ void App_TaskStateMachine(void)
 
     for (;;) {
         if (osMessageQueueGet(queue_activationHandle, &activation_event, NULL, 1000) != osOK) {
+            uint32_t now_tick = osKernelGetTickCount();
+
+            if ((now_tick - idle_log_tick) >= 5000U) {
+                idle_log_tick = now_tick;
+                printf("[StateMachine] waiting activation\n");
+            }
             continue;
         }
 

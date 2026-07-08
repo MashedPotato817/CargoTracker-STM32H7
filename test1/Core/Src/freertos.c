@@ -53,35 +53,35 @@
 osThreadId_t Task_StateMachiHandle;
 const osThreadAttr_t Task_StateMachi_attributes = {
   .name = "Task_StateMachi",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for Task_4G_MQTT */
 osThreadId_t Task_4G_MQTTHandle;
 const osThreadAttr_t Task_4G_MQTT_attributes = {
   .name = "Task_4G_MQTT",
-  .stack_size = 256 * 4,
+  .stack_size = 768 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for Task_I2C_Sensor */
 osThreadId_t Task_I2C_SensorHandle;
 const osThreadAttr_t Task_I2C_Sensor_attributes = {
   .name = "Task_I2C_Sensor",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Task_GPS */
 osThreadId_t Task_GPSHandle;
 const osThreadAttr_t Task_GPS_attributes = {
   .name = "Task_GPS",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Task_Flash */
 osThreadId_t Task_FlashHandle;
 const osThreadAttr_t Task_Flash_attributes = {
   .name = "Task_Flash",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for Task_Alarm */
@@ -109,6 +109,7 @@ const osMessageQueueAttr_t queue_cloud_cmd_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
+static void LogRtosCreateResult(const char *name, void *handle);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -154,7 +155,9 @@ void MX_FREERTOS_Init(void) {
   queue_cloud_cmdHandle = osMessageQueueNew (8, sizeof(uint16_t), &queue_cloud_cmd_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+  LogRtosCreateResult("queue_activation", queue_activationHandle);
+  LogRtosCreateResult("queue_sensor_data", queue_sensor_dataHandle);
+  LogRtosCreateResult("queue_cloud_cmd", queue_cloud_cmdHandle);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -177,7 +180,12 @@ void MX_FREERTOS_Init(void) {
   Task_AlarmHandle = osThreadNew(StartTask_Alarm, NULL, &Task_Alarm_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  LogRtosCreateResult("Task_StateMachi", Task_StateMachiHandle);
+  LogRtosCreateResult("Task_4G_MQTT", Task_4G_MQTTHandle);
+  LogRtosCreateResult("Task_I2C_Sensor", Task_I2C_SensorHandle);
+  LogRtosCreateResult("Task_GPS", Task_GPSHandle);
+  LogRtosCreateResult("Task_Flash", Task_FlashHandle);
+  LogRtosCreateResult("Task_Alarm", Task_AlarmHandle);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -272,6 +280,27 @@ void StartTask_Alarm(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+static void LogRtosCreateResult(const char *name, void *handle)
+{
+  printf("[RTOS] create %s %s\n", name, (handle != NULL) ? "OK" : "FAILED");
+}
+
+void vApplicationMallocFailedHook(void)
+{
+  printf("[RTOS] malloc failed\n");
+  taskDISABLE_INTERRUPTS();
+  for (;;) {
+  }
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  (void)xTask;
+  printf("[RTOS] stack overflow: %s\n", (pcTaskName != NULL) ? pcTaskName : "unknown");
+  taskDISABLE_INTERRUPTS();
+  for (;;) {
+  }
+}
 
 /* USER CODE END Application */
 
