@@ -137,6 +137,7 @@ void PN532_Init(void)
                (unsigned long)HAL_I2C_GetError(&hi2c1),
                (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8),
                (unsigned int)HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_9));
+        I2C1_DebugScan();
         return;
     }
 
