@@ -19,6 +19,7 @@
 #define MQTT_PAYLOAD_MAX     256U
 #define MQTT_RX_BUFFER_SIZE  512U
 #define MQTT_RX_POLL_MS      20U
+#define MQTT_CIPRXGET_INTERVAL_MS 5000U
 
 static uint8_t mqtt_ready = 0U;
 
@@ -65,6 +66,11 @@ static uint8_t TCP_SendATCapture(const char *command,
         if (strstr(response, expected) != NULL) {
             printf("[MQTT] << %s\n", response);
             return 1U;
+        }
+
+        if (strstr(response, "ERROR") != NULL) {
+            printf("[MQTT] << %s\n", response);
+            return 0U;
         }
     }
 
@@ -421,6 +427,11 @@ void MQTT_Init(void)
         return;
     }
 
+    /* Some Air780E firmware requires manual TCP receive mode before CIPRXGET=2. */
+    if (TCP_SendAT("AT+CIPRXGET=1", "OK", 1000U) == 0U) {
+        printf("[MQTT] CIPRXGET manual mode not enabled, raw UART fallback active\n");
+    }
+
     /* Step 2: 发 MQTT CONNECT 包 */
     pkt_len = mqtt_build_connect(connect_pkt);
     printf("[MQTT] sending MQTT CONNECT (%lu bytes)\n", (unsigned long)pkt_len);
@@ -505,17 +516,25 @@ AppCloudCommand MQTT_PollCommand(void)
     uint8_t rx[MQTT_RX_BUFFER_SIZE] = {0};
     char response[MQTT_RX_BUFFER_SIZE] = {0};
     uint32_t rx_len;
+    uint32_t now_tick;
+    static uint32_t last_ciprxget_tick = 0U;
     AppCloudCommand command;
 
     if ((Air780E_IsNetworkReady() == 0U) || (mqtt_ready == 0U)) {
         return APP_CLOUD_CMD_NONE;
     }
 
-    rx_len = MQTT_ReadUartBytes(rx, sizeof(rx), 250U);
+    rx_len = MQTT_ReadUartBytes(rx, sizeof(rx), 600U);
     command = MQTT_ParsePublishBuffer(rx, rx_len);
     if (command != APP_CLOUD_CMD_NONE) {
         return command;
     }
+
+    now_tick = HAL_GetTick();
+    if ((now_tick - last_ciprxget_tick) < MQTT_CIPRXGET_INTERVAL_MS) {
+        return APP_CLOUD_CMD_NONE;
+    }
+    last_ciprxget_tick = now_tick;
 
     if (TCP_SendATCapture("AT+CIPRXGET=2,256",
                           "+CIPRXGET:",

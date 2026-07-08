@@ -15,6 +15,7 @@
 
 文件：
 - `test1/Core/Src/air780e/mqtt.c`
+- `test1/Core/Src/app/app.c`
 
 改动：
 - 新增 `TCP_SendATCapture()`，保留 AT 命令返回内容，供 `AT+CIPRXGET` 路径解析。
@@ -23,12 +24,16 @@
 - `MQTT_PollCommand()` 先读取 UART 已到达数据，再用 `AT+CIPRXGET=2,256` 拉取 TCP 缓冲数据。
 - 删除真实 UART 模式下的 stub 轮转 fallback，避免设备在没有真实云端消息时伪造 HOLD / RETURN / CONTINUE。
 - 保留对 raw JSON / 十六进制文本的简化搜索，兼容 Air780E 不同返回格式。
+- 根据串口日志中 `AT+CIPRXGET=2,256` timeout 的现象，在 TCP 连接后尝试 `AT+CIPRXGET=1` 开启手动 TCP 接收模式。
+- `CIPRXGET=2` fallback 限制为 5s 一次，避免不支持该命令时反复 2s timeout 抢占 USART1。
+- `STATE_WAIT_CLOUD` 云命令等待窗口从 5s 调整为 30s。
+- `Task_4G_MQTT` 轮询周期从 4s 调整为 1s。
 
 ## 未跨范围修改
 
 - 未修改 `.ioc`。
 - 未修改 `Drivers/` / `Middlewares/`。
-- 未修改 app 状态机和队列结构。
+- 未修改 app 状态枚举和队列结构。
 - 未改 Air780E AT 初始化序列。
 
 ## 验证结果
@@ -52,6 +57,17 @@ gcc -fsyntax-only -std=c99 -Wall -Wextra -DSTM32H7A3xxQ -DUSE_HAL_DRIVER `
 - `FreeRTOSConfig.h`：`configENABLE_FPU=1`，`configENABLE_MPU=0`。
 - `main.c`：已调用 `MX_I2C1_Init()`、`MX_SPI1_Init()`、`MX_USART1_UART_Init()`、`MX_USART2_UART_Init()`。
 - `gpio.c`：PB0 `AIR780E_PWRKEY` 默认 `GPIO_PIN_SET` 释放，未与 LED 低电平混写。
+
+## 串口日志复盘
+
+用户提供的硬件日志证明：
+- Air780E 注册正常：`CSQ=26`、`CREG/CGREG/CEREG=0,1`、`CGATT=1`。
+- TCP/MQTT 正常打通：`CONNECT`、CONNACK drain 4 bytes、`[MQTT] subscribed cargo/cmd`。
+- 当前未收到云命令的直接现象是：`AT+CIPRXGET=2,256` 多次 timeout，状态机在 5s WAIT_CLOUD 内没有等到 `queue_cloud_cmd`，随后打印 `cloud action: NONE` 并关闭 Air780E。
+
+本轮针对这两个点做了补丁：
+- 给 dashboard 下发命令留出 30s 窗口。
+- 提高 MQTT 轮询频率，并减少 `CIPRXGET` timeout 对串口的占用。
 
 ## Keil 构建状态
 

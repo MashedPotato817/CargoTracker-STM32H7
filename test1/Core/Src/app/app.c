@@ -18,6 +18,9 @@ extern osMessageQueueId_t queue_activationHandle;
 extern osMessageQueueId_t queue_sensor_dataHandle;
 extern osMessageQueueId_t queue_cloud_cmdHandle;
 
+#define APP_CLOUD_WAIT_MS 30000U
+#define APP_MQTT_POLL_MS 1000U
+
 static volatile uint8_t gps_sample_requested = 0;
 static volatile uint8_t env_sample_requested = 0;
 
@@ -163,7 +166,7 @@ void App_TaskStateMachine(void)
         reset_queue(queue_cloud_cmdHandle);
         StateMachine_Set(STATE_WAIT_CLOUD);
         cloud_value = APP_CLOUD_CMD_NONE;
-        if (osMessageQueueGet(queue_cloud_cmdHandle, &cloud_value, NULL, 5000) == osOK) {
+        if (osMessageQueueGet(queue_cloud_cmdHandle, &cloud_value, NULL, APP_CLOUD_WAIT_MS) == osOK) {
             handle_cloud_command((AppCloudCommand)cloud_value);
         } else {
             handle_cloud_command(APP_CLOUD_CMD_NONE);
@@ -246,7 +249,7 @@ void App_Task4GMQTT(void)
             (void)osMessageQueuePut(queue_cloud_cmdHandle, &command_value, 0, 0);
         }
 
-        osDelay(4000);
+        osDelay(APP_MQTT_POLL_MS);
     }
 }
 

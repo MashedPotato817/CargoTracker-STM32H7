@@ -8,7 +8,7 @@
 - ✅ dashboard 按钮发布 `cargo/cmd` → broker 正常
 - ✅ `MQTT_Init()` 在 CONNECT 成功后订阅 `cargo/cmd`
 - ✅ `MQTT_PollCommand()` 已移除 stub 轮转伪造，改为读取真实 UART/TCP/MQTT 数据
-- ⚠️ 待硬件串口验证：dashboard 下发后应看到 `cloud cmd received` 和状态机 action 日志
+- ⚠️ 串口日志显示 CONNECT / SUBSCRIBE 已通，但 `AT+CIPRXGET=2,256` 超时且原 5s WAIT_CLOUD 窗口太短；已加长等待并加快轮询，待再次硬件验证
 
 ## 目标
 
@@ -43,11 +43,18 @@ printf("[MQTT] subscribed cargo/cmd\n");
 已删掉原 stub 轮转伪造逻辑。当前实现：
 
 - 先从 USART1 读取已到达的原始字节，按 MQTT PUBLISH 固定头 / Remaining Length / Topic / Payload 解析云端 payload。
-- 再发送 `AT+CIPRXGET=2,256` 拉取 TCP 缓冲数据，兼容 Air780E 将数据以 raw / ASCII / 十六进制文本返回的情况。
+- TCP 连接后尝试 `AT+CIPRXGET=1` 开启手动接收；轮询时再用 `AT+CIPRXGET=2,256` 拉取 TCP 缓冲数据，兼容 Air780E 将数据以 raw / ASCII / 十六进制文本返回的情况。
+- `CIPRXGET` fallback 限制为 5s 一次，避免不支持该命令时反复 2s timeout 抢占 USART1。
 - 使用 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()` 将 `HOLD`、`RETURN`、`CONTINUE` 映射为 `AppCloudCommand`。
 - 没有真实云端数据时返回 `APP_CLOUD_CMD_NONE`，不再伪造云端指令。
 
-### 3. 备用简化方案
+### 3. 状态机等待窗口
+
+- `STATE_WAIT_CLOUD` 等待云命令时间从 5s 调整为 30s。
+- `Task_4G_MQTT` 轮询周期从 4s 调整为 1s。
+- 目的：给 dashboard 按钮下发和 MQTT PUBLISH 接收留出足够窗口，避免状态机过早 `cloud action: NONE` 并关断 Air780E。
+
+### 4. 备用简化方案
 
 如果 USART1 逐字节解析 MQTT PUBLISH 太复杂，用 AT+CIPRXGET 读取 TCP 数据：
 
@@ -94,6 +101,7 @@ AppCloudCommand MQTT_PollCommand(void)
 
 - ✅ `test1/Core/Src/air780e/mqtt.c` 已删除真实 UART 模式下的 stub 轮转 fallback
 - ✅ 当前实现使用 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()` 解析 PUBLISH payload 或 raw/CIPRXGET 返回内容
+- ✅ `STATE_WAIT_CLOUD` 已改为 30s，`Task_4G_MQTT` 已改为 1s 轮询
 - ✅ MinGW `gcc -fsyntax-only` 对 `mqtt.c` 语法检查通过（仅 CMSIS 在 x86 下的指针宽度 warning）
 - ⚠️ 当前工作区缺少 `test1/test1.ioc` 和 `test1/MDK-ARM/test1.uvprojx`，无法运行 UV4 Keil 构建；需先从本地/团队工程恢复 CubeMX/Keil 工程文件，再执行完整编译验证
 
