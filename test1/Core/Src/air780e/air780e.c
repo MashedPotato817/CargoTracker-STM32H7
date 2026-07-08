@@ -144,8 +144,6 @@ void Air780E_Init(void)
     printf("[Air780E] init start (stub AT, set AIR780E_USE_HAL_UART=1 after CubeMX enables USART1)\n");
 #endif
     Power_Air780E_PowerOn();
-    printf("[Air780E] waiting for module boot...\n");
-    HAL_Delay(5000);  /* 等模块启动 5 秒 */
 
     at_ok = Air780E_SendAT("AT", "OK", 3000U);
     echo_ok = Air780E_SendAT("ATE0", "OK", 1000U);
