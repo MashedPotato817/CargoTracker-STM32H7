@@ -338,6 +338,12 @@ AppCloudCommand MQTT_PollCommand(void)
     static uint32_t poll_count = 0;
     const char *payload = "";
 
+#if AIR780E_USE_HAL_UART
+    if ((Air780E_IsNetworkReady() == 0U) || (mqtt_ready == 0U)) {
+        return APP_CLOUD_CMD_NONE;
+    }
+#endif
+
     poll_count++;
     if ((poll_count % 9U) == 0U) {
         payload = "{\"cmd\":\"RETURN\"}";

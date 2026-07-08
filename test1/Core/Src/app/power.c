@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include "main.h"
 
+#define AIR780E_PWRKEY_PULSE_MS 1500U
+#define AIR780E_BOOT_WAIT_MS    5000U
+
 void Power_Init(void)
 {
     Power_Air780E_SetPwrKey(0);
@@ -20,8 +23,12 @@ void Power_EnterStopStub(void)
 
 void Power_Air780E_PowerOn(void)
 {
+    printf("[Power] Air780E power-on (PWRKEY low 1.5s)\n");
+    Power_Air780E_SetPwrKey(1);
+    HAL_Delay(AIR780E_PWRKEY_PULSE_MS);
     Power_Air780E_SetPwrKey(0);
-    printf("[Power] Air780E PWRKEY released for VBAT auto-start\n");
+    printf("[Power] Air780E boot wait 5s\n");
+    HAL_Delay(AIR780E_BOOT_WAIT_MS);
 }
 
 void Power_Air780E_PowerOff(void)
@@ -29,7 +36,7 @@ void Power_Air780E_PowerOff(void)
 #if defined(AIR780E_PWRKEY_GPIO_Port) && defined(AIR780E_PWRKEY_Pin)
     printf("[Power] Air780E power-off (PWRKEY low 1.5s)\n");
     Power_Air780E_SetPwrKey(1);
-    HAL_Delay(1500);
+    HAL_Delay(AIR780E_PWRKEY_PULSE_MS);
     Power_Air780E_SetPwrKey(0);
 #endif
 }
