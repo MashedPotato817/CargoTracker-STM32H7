@@ -91,9 +91,21 @@ void App_TaskStateMachine(void)
     uint16_t activation_event = 0;
     uint16_t cloud_value = APP_CLOUD_CMD_NONE;
 
+    printf("[SM] task started!\n");
     StateMachine_Init();
+    printf("[SM] state_machine done\n");
     Alarm_Init();
+    printf("[SM] alarm done\n");
     Power_Init();
+    printf("[SM] power done\n");
+
+    printf("[StateMachine] === AUTO-START full flow ===\n");
+
+    /* 启动后自动触发一次（PC13 按键硬件故障临时绕过） */
+    {
+        uint16_t auto_event = APP_ACTIVATION_NFC;
+        (void)osMessageQueuePut(queue_activationHandle, &auto_event, 0, 0);
+    }
 
     for (;;) {
         if (osMessageQueueGet(queue_activationHandle, &activation_event, NULL, 1000) != osOK) {
@@ -162,7 +174,9 @@ void App_TaskI2CSensors(void)
     char uid[24];
 
     SHT31_Init();
+    printf("[I2C Task] SHT31 done, starting PN532...\n");
     PN532_Init();
+    printf("[I2C Task] PN532 done\n");
 
     for (;;) {
         if (PN532_ReadCard(uid, sizeof(uid)) != 0U) {
