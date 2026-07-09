@@ -1,5 +1,6 @@
 #include "flash/w25q128.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include "main.h"
@@ -16,14 +17,18 @@
 #define W25Q128_CMD_READ_DATA    0x03U
 #define W25Q128_CMD_JEDEC_ID     0x9FU
 #define W25Q128_STATUS_BUSY      0x01U
+#define W25Q128_STATUS_WEL       0x02U
 #define W25Q128_TIMEOUT_MS       100U
 #define W25Q128_ERASE_TIMEOUT_MS 4000U
 #define W25Q128_TELEM_BASE_ADDR  0x000000U
 #define W25Q128_TELEM_SLOT_SIZE  32U
 #define W25Q128_TELEM_SLOTS      128U
 #define W25Q128_SECTOR_SIZE      4096U
+#define W25Q128_RECORD_MAGIC     0xA5C35A3CU
+#define W25Q128_ERASED_MAGIC     0xFFFFFFFFU
 
 static uint32_t write_slot = 0U;
+static uint8_t cache_full = 0U;
 
 typedef struct {
     float temperature_c;
@@ -60,9 +65,28 @@ static uint8_t w25q128_rx(uint8_t *data, uint16_t len)
                : 0U;
 }
 
+static uint8_t w25q128_read_status(uint8_t *status)
+{
+    uint8_t cmd = W25Q128_CMD_READ_STATUS;
+
+    if (status == NULL) {
+        return 0U;
+    }
+
+    w25q128_select();
+    if ((w25q128_tx(&cmd, 1U) == 0U) || (w25q128_rx(status, 1U) == 0U)) {
+        w25q128_deselect();
+        return 0U;
+    }
+    w25q128_deselect();
+
+    return 1U;
+}
+
 static uint8_t w25q128_write_enable(void)
 {
     uint8_t cmd = W25Q128_CMD_WRITE_ENABLE;
+    uint8_t status = 0U;
 
     w25q128_select();
     if (w25q128_tx(&cmd, 1U) == 0U) {
@@ -70,7 +94,12 @@ static uint8_t w25q128_write_enable(void)
         return 0U;
     }
     w25q128_deselect();
-    return 1U;
+
+    if (w25q128_read_status(&status) == 0U) {
+        return 0U;
+    }
+
+    return ((status & W25Q128_STATUS_WEL) != 0U) ? 1U : 0U;
 }
 
 static uint8_t w25q128_wait_ready(uint32_t timeout_ms)
@@ -80,12 +109,9 @@ static uint8_t w25q128_wait_ready(uint32_t timeout_ms)
     uint32_t start = HAL_GetTick();
 
     while ((HAL_GetTick() - start) < timeout_ms) {
-        w25q128_select();
-        if ((w25q128_tx(&cmd, 1U) == 0U) || (w25q128_rx(&status, 1U) == 0U)) {
-            w25q128_deselect();
+        if (w25q128_read_status(&status) == 0U) {
             return 0U;
         }
-        w25q128_deselect();
 
         if ((status & W25Q128_STATUS_BUSY) == 0U) {
             return 1U;
@@ -146,7 +172,8 @@ static uint8_t w25q128_page_program(uint32_t addr, const uint8_t *data,
 {
     uint8_t cmd[4];
 
-    if ((data == NULL) || (len == 0U) || (len > 256U)) {
+    if ((data == NULL) || (len == 0U) || (len > 256U) ||
+        (((addr & 0xFFU) + (uint32_t)len) > 256U)) {
         return 0U;
     }
 
@@ -168,6 +195,61 @@ static uint8_t w25q128_page_program(uint32_t addr, const uint8_t *data,
 
     return w25q128_wait_ready(W25Q128_TIMEOUT_MS);
 }
+
+static uint8_t w25q128_read_magic(uint32_t slot, uint32_t *magic)
+{
+    uint32_t addr;
+
+    if ((magic == NULL) || (slot >= W25Q128_TELEM_SLOTS)) {
+        return 0U;
+    }
+
+    addr = W25Q128_TELEM_BASE_ADDR +
+           (slot * W25Q128_TELEM_SLOT_SIZE) +
+           (uint32_t)offsetof(W25Q128TelemetryRecord, magic);
+
+    return w25q128_read_data(addr, (uint8_t *)magic, (uint16_t)sizeof(*magic));
+}
+
+static void w25q128_scan_slots(void)
+{
+    uint32_t slot;
+    uint32_t magic;
+    uint32_t first_erased = W25Q128_TELEM_SLOTS;
+    uint32_t valid_count = 0U;
+
+    write_slot = 0U;
+    cache_full = 0U;
+
+    for (slot = 0U; slot < W25Q128_TELEM_SLOTS; slot++) {
+        if (w25q128_read_magic(slot, &magic) == 0U) {
+            cache_full = 1U;
+            printf("[W25Q128] slot scan failed at %u\n", (unsigned int)slot);
+            return;
+        }
+
+        if (magic == W25Q128_RECORD_MAGIC) {
+            valid_count++;
+        } else if ((magic == W25Q128_ERASED_MAGIC) &&
+                   (first_erased == W25Q128_TELEM_SLOTS)) {
+            first_erased = slot;
+        }
+    }
+
+    if (first_erased < W25Q128_TELEM_SLOTS) {
+        write_slot = first_erased;
+        return;
+    }
+
+    if (valid_count == 0U) {
+        if (w25q128_sector_erase(W25Q128_TELEM_BASE_ADDR) != 0U) {
+            write_slot = 0U;
+            return;
+        }
+    }
+
+    cache_full = 1U;
+}
 #endif
 
 void W25Q128_Init(void)
@@ -180,6 +262,10 @@ void W25Q128_Init(void)
     w25q128_select();
     if ((w25q128_tx(&cmd, 1U) != 0U) && (w25q128_rx(id, sizeof(id)) != 0U)) {
         printf("[W25Q128] JEDEC ID: %02X %02X %02X\n", id[0], id[1], id[2]);
+        w25q128_scan_slots();
+        printf("[W25Q128] cache next slot=%u full=%u\n",
+               (unsigned int)write_slot,
+               (unsigned int)cache_full);
     } else {
         printf("[W25Q128] init failed (SPI1 PA4/PA5/PA6/PA7)\n");
     }
@@ -205,19 +291,25 @@ uint8_t W25Q128_WriteTelemetry(const TelemetryData *telemetry)
     record.longitude = telemetry->gps.longitude;
     record.env_valid = telemetry->env.valid;
     record.gps_valid = telemetry->gps.valid;
-    record.magic = 0xA5C35A3CU;
+    record.magic = W25Q128_RECORD_MAGIC;
 
     addr = W25Q128_TELEM_BASE_ADDR + (write_slot * W25Q128_TELEM_SLOT_SIZE);
-    write_slot = (write_slot + 1U) % W25Q128_TELEM_SLOTS;
 
 #if W25Q128_USE_HAL_SPI
     uint8_t verify[sizeof(W25Q128TelemetryRecord)] = {0};
+    uint32_t slot_magic = 0U;
 
-    if ((addr % W25Q128_SECTOR_SIZE) == 0U) {
-        if (w25q128_sector_erase(addr) == 0U) {
-            printf("[W25Q128] erase failed at 0x%06X\n", (unsigned int)addr);
-            return 0U;
-        }
+    if (cache_full != 0U) {
+        printf("[W25Q128] cache full, telemetry not cached\n");
+        return 0U;
+    }
+
+    if ((w25q128_read_magic(write_slot, &slot_magic) == 0U) ||
+        (slot_magic != W25Q128_ERASED_MAGIC)) {
+        printf("[W25Q128] slot %u not erased, telemetry not cached\n",
+               (unsigned int)write_slot);
+        cache_full = 1U;
+        return 0U;
     }
 
     if (w25q128_page_program(addr, (const uint8_t *)&record,
@@ -233,7 +325,13 @@ uint8_t W25Q128_WriteTelemetry(const TelemetryData *telemetry)
     }
 
     printf("[W25Q128] cached telemetry at 0x%06X\n", (unsigned int)addr);
+    write_slot++;
+    if (write_slot >= W25Q128_TELEM_SLOTS) {
+        write_slot = 0U;
+        cache_full = 1U;
+    }
 #else
+    write_slot = (write_slot + 1U) % W25Q128_TELEM_SLOTS;
     printf("[W25Q128] cache telemetry stub slot=%u\n", (unsigned int)write_slot);
 #endif
     return 1;
@@ -256,7 +354,7 @@ uint8_t W25Q128_FlushCache(void)
 #if W25Q128_USE_HAL_SPI
         w25q128_read_data(addr, (uint8_t *)&record, (uint16_t)sizeof(record));
 
-        if (record.magic != 0xA5C35A3CU) {
+        if (record.magic != W25Q128_RECORD_MAGIC) {
             continue;
         }
 
@@ -274,18 +372,28 @@ uint8_t W25Q128_FlushCache(void)
                (double)record.latitude, (double)record.longitude);
 
         if (MQTT_PublishTelemetry(&telemetry) != 0U) {
+            uint32_t clear_magic = 0U;
+            uint32_t magic_addr = addr + (uint32_t)offsetof(W25Q128TelemetryRecord, magic);
+
             sent++;
             /* 清除 magic 标记已发送 */
-            record.magic = 0U;
-            w25q128_sector_erase(addr);
-            w25q128_page_program(addr, (const uint8_t *)&record,
-                                 (uint16_t)sizeof(record));
+            if (w25q128_page_program(magic_addr,
+                                     (const uint8_t *)&clear_magic,
+                                     (uint16_t)sizeof(clear_magic)) == 0U) {
+                printf("[W25Q128] clear sent slot %u failed\n", (unsigned int)slot);
+            }
         }
 #else
         (void)addr;
         (void)telemetry;
 #endif
     }
+
+#if W25Q128_USE_HAL_SPI
+    if (sent > 0U) {
+        w25q128_scan_slots();
+    }
+#endif
 
     printf("[W25Q128] flush done: %u retransmitted\n", sent);
     return sent;

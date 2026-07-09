@@ -11,7 +11,9 @@
 #define GPS_UART_CHAR_TIMEOUT_MS 20U
 #define GPS_UART_LINE_TIMEOUT_MS 1200U
 #define GPS_UART_BAUDRATE 9600U
+#define GPS_UART_FALLBACK_BAUDRATE 115200U
 #define GPS_COORD_SCALE 1000000L
+#define GPS_SCAN_SENTENCES 16U
 
 static GpsLocation last_location = {0.0f, 0.0f, 0U};  /* valid=0 直到真定位 */
 
@@ -105,9 +107,31 @@ static uint32_t GPS_SplitFields(char *line, char *fields[], uint32_t max_fields)
 }
 
 #if GPS_USE_HAL_UART
+static uint32_t gps_active_baudrate = GPS_UART_BAUDRATE;
+
 static void GPS_ClearUartErrors(void)
 {
     __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
+}
+
+static uint8_t GPS_SetBaudRate(uint32_t baudrate)
+{
+    if (huart2.Init.BaudRate == baudrate) {
+        gps_active_baudrate = baudrate;
+        return 1U;
+    }
+
+    (void)HAL_UART_AbortReceive(&huart2);
+    huart2.Init.BaudRate = baudrate;
+    if (HAL_UART_Init(&huart2) != HAL_OK) {
+        printf("[GPS] USART2 reinit %lu failed\n", (unsigned long)baudrate);
+        return 0U;
+    }
+
+    GPS_ClearUartErrors();
+    gps_active_baudrate = baudrate;
+    printf("[GPS] USART2 baud=%lu\n", (unsigned long)baudrate);
+    return 1U;
 }
 #endif
 
@@ -303,15 +327,12 @@ static uint8_t GPS_ParseNmea(const char *line, GpsLocation *location)
 void GPS_Init(void)
 {
 #if GPS_USE_HAL_UART
-    if (huart2.Init.BaudRate != GPS_UART_BAUDRATE) {
-        huart2.Init.BaudRate = GPS_UART_BAUDRATE;
-        if (HAL_UART_Init(&huart2) != HAL_OK) {
-            printf("[GPS] USART2 reinit failed, keep last location fallback\n");
-            return;
-        }
+    if (GPS_SetBaudRate(GPS_UART_BAUDRATE) == 0U) {
+        printf("[GPS] init failed, keep last location fallback\n");
+        return;
     }
 
-    printf("[GPS] init OK (HAL UART, ATGM336H on USART2 PD5/PD6)\n");
+    printf("[GPS] init OK (HAL UART, USART2 PD5/PD6, auto 9600/115200)\n");
 #else
     printf("[GPS] init OK (stub NMEA, set GPS_USE_HAL_UART=1 after CubeMX enables USART2)\n");
 #endif
@@ -321,20 +342,56 @@ GpsLocation GPS_GetLocation(void)
 {
     char line[GPS_NMEA_LINE_MAX];
     GpsLocation location = last_location;
-    int tries;
+    uint8_t baud_index;
+    uint32_t baudrates[2] = {
+        GPS_UART_BAUDRATE,
+        GPS_UART_FALLBACK_BAUDRATE
+    };
 
     location.valid = 0U;
 
-    /* 循环读 3 行 NMEA，找到有效定位即停止 */
-    for (tries = 0; tries < 3; tries++) {
-        if (GPS_ReadLine(line, sizeof(line)) == 0U) {
-            break;
+#if GPS_USE_HAL_UART
+    if (gps_active_baudrate == GPS_UART_FALLBACK_BAUDRATE) {
+        baudrates[0] = GPS_UART_FALLBACK_BAUDRATE;
+        baudrates[1] = GPS_UART_BAUDRATE;
+    }
+#endif
+
+    for (baud_index = 0U; baud_index < (uint8_t)(sizeof(baudrates) / sizeof(baudrates[0])); baud_index++) {
+        uint8_t tries;
+        uint8_t saw_sentence = 0U;
+
+#if GPS_USE_HAL_UART
+        if (GPS_SetBaudRate(baudrates[baud_index]) == 0U) {
+            continue;
         }
-        if (GPS_ParseNmea(line, &location) != 0U) {
-            last_location = location;
-            return location;  /* 立即返回真数据 */
+#endif
+
+        for (tries = 0U; tries < GPS_SCAN_SENTENCES; tries++) {
+            if (GPS_ReadLine(line, sizeof(line)) == 0U) {
+                break;
+            }
+
+            saw_sentence = 1U;
+            if (GPS_ParseNmea(line, &location) != 0U) {
+                last_location = location;
+                printf("[GPS] fix OK baud=%lu\n", (unsigned long)baudrates[baud_index]);
+                return location;
+            }
+
+            if (tries < 3U) {
+                printf("[GPS] NMEA no fix: %s\n", line);
+            }
+        }
+
+        if (saw_sentence != 0U) {
+            printf("[GPS] NMEA received but no valid fix, baud=%lu\n",
+                   (unsigned long)baudrates[baud_index]);
+            return location;
         }
     }
+
+    printf("[GPS] no NMEA on USART2, check PD6 RX wiring and GPS baud\n");
 
     return location;
 }

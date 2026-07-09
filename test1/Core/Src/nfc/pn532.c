@@ -1,6 +1,7 @@
 #include "nfc/pn532.h"
 
 #include <stdio.h>
+#include "cmsis_os2.h"
 #include "main.h"
 
 #if PN532_USE_HAL_I2C
@@ -29,7 +30,7 @@ static uint8_t pn532_read_ready_frame(uint8_t *frame, uint16_t frame_size)
             return 1U;
         }
 
-        HAL_Delay(5U);
+        osDelay(5U);
     }
 
     return 0U;
@@ -90,6 +91,7 @@ static uint8_t pn532_read_response(uint8_t expected_cmd, uint8_t *payload,
 {
     uint8_t frame[PN532_FRAME_MAX] = {0};
     uint8_t len;
+    uint8_t sum;
     uint8_t i;
 
     if (pn532_read_ready_frame(frame, sizeof(frame)) == 0U) {
@@ -106,8 +108,21 @@ static uint8_t pn532_read_response(uint8_t expected_cmd, uint8_t *payload,
         return 0U;
     }
 
-    if ((len < 2U) || (frame[6] != PN532_PN532_TO_HOST) ||
+    if ((len < 2U) || ((uint32_t)len + 7U >= PN532_FRAME_MAX)) {
+        return 0U;
+    }
+
+    if ((frame[6] != PN532_PN532_TO_HOST) ||
         (frame[7] != (uint8_t)(expected_cmd + 1U))) {
+        return 0U;
+    }
+
+    sum = 0U;
+    for (i = 0U; i < len; i++) {
+        sum = (uint8_t)(sum + frame[6U + i]);
+    }
+    if (((uint8_t)(sum + frame[6U + len]) != 0U) ||
+        (frame[7U + len] != 0x00U)) {
         return 0U;
     }
 

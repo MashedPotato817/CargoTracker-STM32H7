@@ -1,6 +1,7 @@
 #include "sensor/sht31.h"
 
 #include <stdio.h>
+#include "cmsis_os2.h"
 #include "main.h"
 
 #if SHT31_USE_HAL_I2C
@@ -51,7 +52,7 @@ static uint8_t sht31_update_sample(void)
         return 0U;
     }
 
-    HAL_Delay(SHT31_MEASURE_DELAY_MS);
+    osDelay(SHT31_MEASURE_DELAY_MS);
 
     if (HAL_I2C_Master_Receive(&hi2c1, SHT31_I2C_ADDR, data, sizeof(data),
                                SHT31_I2C_TIMEOUT_MS) != HAL_OK) {

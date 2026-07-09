@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "cmsis_os2.h"
 #include "air780e/air780e.h"
 
 #if AIR780E_USE_HAL_UART
@@ -25,6 +26,36 @@
 #define MQTT_COORD_SCALE     1000000L
 
 static uint8_t mqtt_ready = 0U;
+static osMutexId_t mqtt_uart_mutex = NULL;
+
+static uint8_t MQTT_EnsureMutex(void)
+{
+    if (mqtt_uart_mutex == NULL) {
+        mqtt_uart_mutex = osMutexNew(NULL);
+    }
+
+    return (mqtt_uart_mutex != NULL) ? 1U : 0U;
+}
+
+static uint8_t MQTT_Lock(uint32_t timeout_ms)
+{
+    if (osKernelGetState() != osKernelRunning) {
+        return 1U;
+    }
+
+    if (MQTT_EnsureMutex() == 0U) {
+        return 0U;
+    }
+
+    return (osMutexAcquire(mqtt_uart_mutex, timeout_ms) == osOK) ? 1U : 0U;
+}
+
+static void MQTT_Unlock(void)
+{
+    if ((osKernelGetState() == osKernelRunning) && (mqtt_uart_mutex != NULL)) {
+        (void)osMutexRelease(mqtt_uart_mutex);
+    }
+}
 
 /* ---------- TCP AT 指令（Air780E 通用） ---------- */
 
@@ -223,7 +254,7 @@ static uint8_t TCP_SendBinary(uint8_t *data, uint32_t len)
     }
 
     /* 发送原始二进制 */
-    HAL_Delay(50);
+    osDelay(50U);
     if (HAL_UART_Transmit(&huart1, data, (uint16_t)len, 5000U) != HAL_OK) {
         printf("[MQTT] binary transmit failed\n");
         return 0U;
@@ -252,8 +283,8 @@ static uint8_t TCP_SendBinary(uint8_t *data, uint32_t len)
         }
     }
 
-    printf("[MQTT] SEND OK wait timeout, assume sent\n");
-    return 1U;
+    printf("[MQTT] SEND OK wait timeout\n");
+    return 0U;
 #else
     (void)data;
     (void)len;
@@ -375,20 +406,72 @@ static uint8_t MQTT_BufferContains(const uint8_t *buf, uint32_t len, const char 
 
 static AppCloudCommand MQTT_ParseCommandBytes(const uint8_t *buf, uint32_t len)
 {
-    if ((MQTT_BufferContains(buf, len, "HOLD") != 0U) ||
-        (MQTT_BufferContains(buf, len, "484F4C44") != 0U)) {
+    if (MQTT_BufferContains(buf, len, "\"cmd\"") == 0U) {
+        return APP_CLOUD_CMD_NONE;
+    }
+
+    if (MQTT_BufferContains(buf, len, "\"HOLD\"") != 0U) {
         return APP_CLOUD_CMD_HOLD;
     }
-    if ((MQTT_BufferContains(buf, len, "RETURN") != 0U) ||
-        (MQTT_BufferContains(buf, len, "52455455524E") != 0U)) {
+    if (MQTT_BufferContains(buf, len, "\"RETURN\"") != 0U) {
         return APP_CLOUD_CMD_RETURN;
     }
-    if ((MQTT_BufferContains(buf, len, "CONTINUE") != 0U) ||
-        (MQTT_BufferContains(buf, len, "434F4E54494E5545") != 0U)) {
+    if (MQTT_BufferContains(buf, len, "\"CONTINUE\"") != 0U) {
         return APP_CLOUD_CMD_CONTINUE;
     }
 
     return APP_CLOUD_CMD_NONE;
+}
+
+static uint8_t MQTT_ConnackReturnCode(const uint8_t *buf, uint32_t len, uint8_t *return_code)
+{
+    uint32_t i;
+
+    if ((buf == NULL) || (return_code == NULL) || (len < 4U)) {
+        return 0U;
+    }
+
+    for (i = 0U; i <= (len - 4U); i++) {
+        if ((buf[i] == 0x20U) && (buf[i + 1U] == 0x02U)) {
+            *return_code = buf[i + 3U];
+            return 1U;
+        }
+    }
+
+    return 0U;
+}
+
+static uint32_t MQTT_BuildSubscribe(uint8_t *buf, uint32_t buf_size, const char *topic)
+{
+    uint32_t pos = 0U;
+    uint32_t topic_len;
+    uint32_t remaining;
+    uint8_t encoded[4] = {0};
+    uint8_t len_size;
+    uint8_t i;
+
+    if ((buf == NULL) || (topic == NULL)) {
+        return 0U;
+    }
+
+    topic_len = (uint32_t)strlen(topic);
+    remaining = 2U + 2U + topic_len + 1U;
+    len_size = mqtt_encode_length(remaining, encoded);
+
+    if (buf_size < (1U + len_size + remaining)) {
+        return 0U;
+    }
+
+    buf[pos++] = 0x82U;
+    for (i = 0U; i < len_size; i++) {
+        buf[pos++] = encoded[i];
+    }
+    buf[pos++] = 0x00U;
+    buf[pos++] = 0x01U;
+    pos += mqtt_write_str(buf, pos, topic);
+    buf[pos++] = 0x00U;
+
+    return pos;
 }
 
 static AppCloudCommand MQTT_ParsePublishBuffer(const uint8_t *buf, uint32_t len)
@@ -513,12 +596,19 @@ void MQTT_Init(void)
     }
 
 #if AIR780E_USE_HAL_UART
+    if (MQTT_Lock(osWaitForever) == 0U) {
+        mqtt_ready = 0U;
+        printf("[MQTT] init skipped: UART lock unavailable\n");
+        return;
+    }
+
     printf("[MQTT] init: Air780E TCP MQTT stack\n");
 
     /* Step 0: 激活 PDP 上下文 */
     if (TCP_SendAT("AT+CGACT=1,1", "OK", 3000U) == 0U) {
         printf("[MQTT] PDP activate failed\n");
         mqtt_ready = 0U;
+        MQTT_Unlock();
         return;
     }
 
@@ -532,6 +622,7 @@ void MQTT_Init(void)
     if (TCP_SendAT(cmd, "CONNECT", 10000U) == 0U) {
         printf("[MQTT] TCP connect failed\n");
         mqtt_ready = 0U;
+        MQTT_Unlock();
         return;
     }
 
@@ -546,6 +637,7 @@ void MQTT_Init(void)
     if (TCP_SendBinary(connect_pkt, pkt_len) == 0U) {
         printf("[MQTT] MQTT CONNECT send failed\n");
         mqtt_ready = 0U;
+        MQTT_Unlock();
         return;
     }
 
@@ -554,6 +646,7 @@ void MQTT_Init(void)
         uint8_t drain[64] = {0};
         uint32_t drain_pos = 0;
         uint8_t ch;
+        uint8_t return_code = 0xFFU;
         uint32_t t = HAL_GetTick();
 
         printf("[MQTT] waiting CONNACK...\n");
@@ -565,31 +658,38 @@ void MQTT_Init(void)
                 }
             }
             /* 收到 4+ 字节 CONNACK 就停 */
-            if (drain_pos >= 4U) break;
+            if (MQTT_ConnackReturnCode(drain, drain_pos, &return_code) != 0U) {
+                break;
+            }
         }
         printf("[MQTT] CONNACK drain: %lu bytes\n", (unsigned long)drain_pos);
+        if ((MQTT_ConnackReturnCode(drain, drain_pos, &return_code) == 0U) ||
+            (return_code != 0x00U)) {
+            printf("[MQTT] CONNACK rejected rc=%u\n", (unsigned int)return_code);
+            mqtt_ready = 0U;
+            MQTT_Unlock();
+            return;
+        }
     }
 
     mqtt_ready = 1U;
 
     /* Step 4: 订阅云端指令 topic */
     {
-        const uint8_t sub[] = {
-            0x82, 0x0E,
-            0x00, 0x01,
-            0x00, 0x09,
-            'c', 'a', 'r', 'g', 'o', '/', 'c', 'm', 'd',
-            0x00
-        };
-        if (TCP_SendBinary((uint8_t *)sub, sizeof(sub)) == 0U) {
+        uint8_t sub[64];
+        uint32_t sub_len = MQTT_BuildSubscribe(sub, sizeof(sub), MQTT_TOPIC_CMD);
+
+        if ((sub_len == 0U) || (TCP_SendBinary(sub, sub_len) == 0U)) {
             mqtt_ready = 0U;
             printf("[MQTT] subscribe %s failed\n", MQTT_TOPIC_CMD);
+            MQTT_Unlock();
             return;
         }
         printf("[MQTT] subscribed %s\n", MQTT_TOPIC_CMD);
     }
 
     printf("[MQTT] init OK (TCP MQTT, %s:%u)\n", MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+    MQTT_Unlock();
 #else
     mqtt_ready = 1U;
     printf("[MQTT] init OK (stub)\n");
@@ -609,9 +709,17 @@ uint8_t MQTT_PublishTelemetry(const TelemetryData *telemetry)
     MQTT_BuildTelemetryPayload(telemetry, payload, sizeof(payload));
 
 #if AIR780E_USE_HAL_UART
+    if (MQTT_Lock(osWaitForever) == 0U) {
+        return 0U;
+    }
+
     pkt_len = mqtt_build_publish(pkt, MQTT_TOPIC_TELEM, payload);
     printf("[MQTT] publish %s (%lu bytes)\n", payload, (unsigned long)pkt_len);
-    return TCP_SendBinary(pkt, pkt_len);
+    {
+        uint8_t result = TCP_SendBinary(pkt, pkt_len);
+        MQTT_Unlock();
+        return result;
+    }
 #else
     printf("[MQTT] publish telemetry %s\n", payload);
     return 1;
@@ -632,14 +740,20 @@ AppCloudCommand MQTT_PollCommand(void)
         return APP_CLOUD_CMD_NONE;
     }
 
+    if (MQTT_Lock(0U) == 0U) {
+        return APP_CLOUD_CMD_NONE;
+    }
+
     rx_len = MQTT_ReadUartBytes(rx, sizeof(rx), 600U);
     command = MQTT_ParsePublishBuffer(rx, rx_len);
     if (command != APP_CLOUD_CMD_NONE) {
+        MQTT_Unlock();
         return command;
     }
 
     now_tick = HAL_GetTick();
     if ((now_tick - last_ciprxget_tick) < MQTT_CIPRXGET_INTERVAL_MS) {
+        MQTT_Unlock();
         return APP_CLOUD_CMD_NONE;
     }
     last_ciprxget_tick = now_tick;
@@ -651,16 +765,19 @@ AppCloudCommand MQTT_PollCommand(void)
                           sizeof(response)) != 0U) {
         command = MQTT_ParsePublishBuffer((const uint8_t *)response, (uint32_t)strlen(response));
         if (command != APP_CLOUD_CMD_NONE) {
+            MQTT_Unlock();
             return command;
         }
 
         rx_len = MQTT_ReadUartBytes(rx, sizeof(rx), 500U);
         command = MQTT_ParsePublishBuffer(rx, rx_len);
         if (command != APP_CLOUD_CMD_NONE) {
+            MQTT_Unlock();
             return command;
         }
     }
 
+    MQTT_Unlock();
     return APP_CLOUD_CMD_NONE;
 #else
     return APP_CLOUD_CMD_NONE;
