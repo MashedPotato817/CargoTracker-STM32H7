@@ -167,97 +167,133 @@ MQTT_Publish(payload);
 
 ---
 
-## 4. 通信协议设计（待补充）
+## 4. 通信协议设计
 
-### 4.1 MQTT Topic 设计
+### 4.1 MQTT Topic
 
-暂留待定，模板如下：
+| 方向 | Topic | QoS | 说明 |
+|------|------|:---:|------|
+| 上行（设备→云） | `cargo/telemetry` | 0 | 温湿度+GPS+信号强度 |
+| 下行（云→设备） | `cargo/cmd` | 0 | 云端指令 |
 
-```
-上行（设备→云）：
-  /sys/{ProductKey}/{DeviceName}/thing/event/property/post    数据上报
-  /sys/{ProductKey}/{DeviceName}/thing/event/alert/post       报警上报
+> 开发阶段使用公共 broker：`broker.emqx.io:1883`（TCP）。生产可切换 EMQX Cloud TLS。
 
-下行（云→设备）：
-  /sys/{ProductKey}/{DeviceName}/thing/service/property/set   属性设置
-  /sys/{ProductKey}/{DeviceName}/thing/service/command        指令下发
-```
-
-### 4.2 数据上报 JSON 格式
+### 4.2 数据上报 JSON（实际格式，已验证 ✅）
 
 ```json
-{
-  "id": "msg_001",
-  "timestamp": 1718123456,
-  "params": {
-    "temperature": { "value": 25.5, "unit": "℃" },
-    "humidity":    { "value": 60.0, "unit": "%" },
-    "latitude":    31.2304,
-    "longitude":   121.4737,
-    "gps_valid":   1,
-    "battery":     3.84
-  }
-}
+{"temp":25.0,"hum":49.5,"lat":31.230000,"lon":121.470000,"gps_valid":1,"csq":28}
 ```
 
-### 4.3 云指令格式
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `temp` | float(1位小数) | 温度 ℃ |
+| `hum` | float(1位小数) | 湿度 % |
+| `lat` | float(6位小数) | 纬度（WGS-84） |
+| `lon` | float(6位小数) | 经度（WGS-84） |
+| `gps_valid` | 0/1 | 定位有效标志 |
+| `csq` | 0-31 | 4G 信号强度（≥20 优秀） |
 
-| 指令 | 含义 | 设备响应 |
+> JSON 体积 ~72 bytes，每 10s 上报一次。
+
+### 4.3 云指令
+
+dashboard 按钮 → `cargo/cmd` → Air780E SUBSCRIBE 接收 → MQTT_ParsePublishBuffer 解析
+
+| 指令 | Payload | 设备动作 |
 |------|------|---------|
-| `HOLD` | 暂留 | 保持唤醒，等待后续指令 |
-| `RETURN` | 退货 | 进入退货流程 |
-| `CONTINUE` | 继续运输 | 记录位置后进入低功耗 |
+| 暂留 | `{"cmd":"HOLD"}` | LED2 常亮，保持唤醒 |
+| 退货 | `{"cmd":"RETURN"}` | 触发报警，LED2 快闪+蜂鸣器 |
+| 继续运输 | `{"cmd":"CONTINUE"}` | 清除报警，恢复正常 |
 
-### 4.4 AT 指令初始化序列
-
-```
-AT          → OK           (确认模块在线)
-ATE0        → OK           (关闭回显)
-AT+CSQ      → +CSQ: 25,99  (信号强度)
-AT+CREG?    → +CREG: 0,1   (网络注册)
-AT+CGATT?   → +CGATT: 1    (GPRS 附着)
-AT+CMQTTSTART → OK         (MQTT 会话启动)
-```
-
-### 4.5 离线上传策略
+### 4.4 AT 指令序列（串口实测 ✅）
 
 ```
-MQTT 发布失败 → W25Q128 写入 telemetry 记录（环形队列槽位）
-联网恢复后 → 读取 Flash 未上报记录 → 按时间戳顺序补传
-补传成功 → 标记已上报 → 队列槽位释放
+AT          → OK              AT+CGREG?   → +CGREG: 0,1
+ATE0        → OK              AT+CEREG?   → +CEREG: 0,1
+AT+CSQ      → +CSQ: 28,0      AT+CGATT?   → +CGATT: 1
+AT+CREG?    → +CREG: 0,1
+```
+
+### 4.5 MQTT 连接流程
+
+```
+Air780E Init → AT+PDP 激活 → AT+CIPSTART TCP broker.emqx.io:1883
+  → MQTT CONNECT (29 bytes) → CONNACK (4 bytes)
+  → SUBSCRIBE cargo/cmd → mqtt_ready=1
+  → PUBLISH cargo/telemetry (循环)
+  → PollCommand (1s 周期，CIPRXGET 拉取)
+```
+
+### 4.6 断网缓存策略
+
+```
+PUBLISH 失败/超时 → W25Q128 写入 telemetry 记录（128槽环形队列）
+网络恢复 → 遍历有效 slot → 按序补传 → 标记已上传 → 释放槽位
 ```
 
 ---
 
-## 5. 云端交互流程（待补充）
+## 5. 云端交互
 
-### 5.1 设备注册流程
+### 5.1 云平台
+
+| 项目 | 开发环境 | 生产（答辩） |
+|------|---------|------------|
+| Broker | `broker.emqx.io:1883` TCP | EMQX Cloud `h8111173.ala.cn-hangzhou.emqxsl.cn:8883` TLS |
+| 认证 | 无（公共） | 用户名 CargoTracker / 密码 Cargo2026 |
+| Web 控制台 | `dashboard.html`（自建，GitHub Pages） | 同左 |
+
+### 5.2 数据流（已实现 ✅）
 
 ```
-1. 云平台创建产品 → 定义物模型
-2. 创建设备 → 生成三元组（ProductKey / DeviceName / DeviceSecret）
-3. 设备首次上电 → MQTT 连接 → 认证通过
-4. 上报设备影子 → 云端确认在线
+STM32 采集 → JSON 封装 → MQTT PUBLISH cargo/telemetry → broker
+  → dashboard.html 订阅 cargo/telemetry → 实时仪表盘（温湿度+GPS+信号+地图）
+  
+dashboard 按钮 → MQTT PUBLISH cargo/cmd → broker
+  → Air780E SUBSCRIBE 接收 → MQTT_ParsePublishBuffer → queue_cloud_cmd
+  → 状态机 WAIT_CLOUD → AppCloudCommand → LED/蜂鸣器动作
 ```
 
-### 5.2 数据流
+### 5.3 前后端架构图（GPT 可画）
+
+> 复制以下结构给 GPT，让它画系统前后端交互架构图：
 
 ```
-设备采集 GPS/SHT31 → JSON 封装 → MQTT Publish → 云端存储/规则引擎 → 
-  ├── 数据可视化大屏
-  ├── 阈值超限 → 短信/邮件告警
-  └── 人工/自动下发指令 → MQTT → 设备执行
+一张图包含 3 层：
+┌─ 设备层 ───────────────────────────────────────┐
+│ STM32H7 + FreeRTOS                             │
+│ 6 Tasks: StateMachine/4G_MQTT/I2C_Sensors/     │
+│          GPS/Flash/Alarm                       │
+│ 5 Sensors: SHT31(GPIO), PN532(I2C),            │
+│           ATGM336H(UART), Air780E(UART),        │
+│           W25Q128(SPI)                          │
+└────────────────────┬───────────────────────────┘
+                     │ MQTT (4G)
+┌─ 云端 ─────────────────────────────────────────┐
+│ EMQX Cloud / broker.emqx.io                    │
+│ Topics: cargo/telemetry (上行)                  │
+│         cargo/cmd (下行)                        │
+└────────────────────┬───────────────────────────┘
+                     │ WebSocket
+┌─ 前端 ─────────────────────────────────────────┐
+│ GitHub Pages hosting                           │
+│ dashboard.html (MQTT.js)                       │
+│ index.html (接线指南) | report.html (设计报告)   │
+│ 实时地图(Leaflet+OSM) + 仪表盘 + 指令下发        │
+└────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 6. 低功耗设计（待实现）
+## 6. 低功耗设计
 
-| 模式 | 电流 | 唤醒方式 |
-|------|------|---------|
-| 运行模式 | ~50mA | — |
-| Stop Mode（目标） | <100μA | NFC EXTI / RTC 定时 |
-| 4G 空闲断电 | 0（PWRKEY 关断） | 需要上传时 PWRKEY 开机 |
+| 模式 | 电流 | 唤醒方式 | 状态 |
+|------|------|---------|:---:|
+| 运行模式 | ~50mA | — | ✅ |
+| Stop Mode | <100μA | NFC EXTI (PC13) | ⚠️ stub→真实待实现 |
+| 4G 空闲断电 | 0（PWRKEY 关断） | 上传前 PWRKEY 开机 | ⚠️ 待实现 |
+
+> PWRKEY 时序：>1s 低脉冲开关机，默认保持 HIGH 释放（PB0）。支持软关机 AT+CPOWD=1 + 硬脉冲兜底。
 
 ---
 
@@ -285,17 +321,66 @@ MQTT 发布失败 → W25Q128 写入 telemetry 记录（环形队列槽位）
 
 ---
 
-## 8. 测试方案（待执行）
+## 8. 测试方案
 
-| 测试项 | 方法 | 预期 |
-|--------|------|------|
-| SHT31 | 串口输出温度，手指靠近 | 温度上升 |
-| PN532 | 贴 NFC 标签 | 串口打印 UID |
-| W25Q128 | 上电自检 JEDEC ID | 0xEF17 |
-| GPS | 户外窗边测试 | NMEA status='A' |
-| Air780E AT | 串口 AT 交互 | +CSQ, +CREG 正常 |
-| MQTT 发布 | 云端查看日志 | JSON 数据到达 |
-| 云指令 | 云端下发 HOLD | 设备状态变更 |
-| 断网缓存 | 拔掉 4G 天线 → 发布 → 恢复 | Flash 补传成功 |
-| 低功耗 | 万用表测 Stop 电流 | <100μA |
-| 24h 稳定 | 长时间运行 | 无死机/泄漏 |
+| # | 测试项 | 方法 | 预期 | 实测 |
+|:---:|------|------|------|:---:|
+| 1 | SHT31 | 串口输出温度 | 室温波动 | ✅ 24-25°C / 47-51% |
+| 2 | PN532 | 贴 NFC 标签 | 串口打印 UID | ✅ init OK / ⚠️ 待测标签 |
+| 3 | W25Q128 | 上电自检 JEDEC ID | 0xEF17 | ✅ EF 40 18 |
+| 4 | GPS | 户外窗边测试 | NMEA status='A' | ⚠️ 待户外（当前 stub 31/121） |
+| 5 | Air780E AT | 串口 AT 交互 | CSQ≥20, 注册正常 | ✅ CSQ=27~28, 全部 OK |
+| 6 | MQTT 发布 | dashboard 订阅 | JSON 数据到达 | ✅ 72 bytes, 到达 dashboard |
+| 7 | 云指令 | 按钮下发 → 设备响应 | 状态变更 | ⚠️ 代码就绪，待联调 |
+| 8 | 断网缓存 | 拔天线 → 恢复 | Flash 补传成功 | ❌ 未测 |
+| 9 | 低功耗 | 万用表测电流 | Stop <100μA | ❌ 待实现 |
+| 10 | 24h 稳定 | 长时间运行 | 无死机 | ❌ 未测 |
+
+### 8.1 系统框图（GPT 可画）
+
+> 复制以下结构给 GPT，让它画硬件系统框图：
+
+```
+STM32H7A3ZI 居中，四周环绕 6 个外设：
+
+┌─────────────┐                    ┌─────────────┐
+│   SHT31     │── I2C1(0x44) ─────│             │
+│   温湿度    │                    │   W25Q128   │
+└─────────────┘                    │ SPI1(PA4-7) │
+                                   │   Flash缓存 │
+┌─────────────┐                    │             │
+│   PN532     │── I2C1(0x24) ─────│             │
+│   NFC读写   │                    │ STM32H7A3ZI │
+└─────────────┘                    │  FreeRTOS   │──── LED(PE1/PB14)+蜂鸣器(PC8)
+                                   │  280MHz     │
+┌─────────────┐                    │             │
+│  ATGM336H   │── USART2(PD5/6) ──│             │
+│   GPS定位   │                    │             │
+└─────────────┘                    │             │
+                                   │             │
+┌─────────────┐                    │             │
+│  Air780E    │── USART1(PA9/10) ─│             │
+│  4G+MQTT    │                    │             │
+└─────────────┘                    └─────────────┘
+
+左下标注：电源架构
+USB 5V → TP4056 → 18650(3.7V) → MP1584×2 → 3.3V(MCU+传感器) + 4.0V(Air780E独立)
+```
+
+### 8.2 软件架构图（GPT 可画）
+
+> 复制以下结构给 GPT，让它画 3 层软件架构图：
+
+```
+┌──────── App 层 ──────────────────────────────────────┐
+│ StateMachine (8状态) │ Alarm (LED/蜂鸣器) │ Power(Stop Mode/PWRKEY) │
+├──────── FreeRTOS 层 ─────────────────────────────────┤
+│ 6 Tasks: StateMachine(H) 4G_MQTT(H) I2C_Sensors(N) GPS(N) Flash(L) Alarm(L) │
+│ 3 Queues: queue_activation │ queue_sensor_data │ queue_cloud_cmd │
+├──────── Driver 层 ───────────────────────────────────┤
+│ SHT31(I2C) PN532(I2C) W25Q128(SPI) GPS(UART) Air780E(UART) GPIO │
+│ 条件编译双模式: *_USE_HAL_*=0(stub) / 1(真HAL)       │
+├──────── HAL 层 ──────────────────────────────────────┤
+│ STM32H7xx_HAL_Driver │ CMSIS │ STM32H7A3ZI (Cortex-M7) │
+└──────────────────────────────────────────────────────┘
+```
