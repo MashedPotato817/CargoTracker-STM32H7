@@ -16,14 +16,106 @@
 static GpsLocation last_location = {0.0f, 0.0f, 0U};  /* valid=0 直到真定位 */
 
 static const char *const stub_nmea_sentences[] = {
-    "$GNRMC,092204.999,A,3113.8240,N,12128.4220,E,0.00,0.00,070726,,,A*68",
-    "$GNGGA,092205.999,3113.8240,N,12128.4220,E,1,08,1.0,10.0,M,0.0,M,,*5B"
+    "$GNRMC,092204.999,A,3113.8240,N,12128.4220,E,0.00,0.00,070726,,,A*72",
+    "$GNGGA,092205.999,3113.8240,N,12128.4220,E,1,08,1.0,10.0,M,0.0,M,,*4D"
 };
+
+static uint8_t GPS_IsDigit(char ch)
+{
+    return ((ch >= '0') && (ch <= '9')) ? 1U : 0U;
+}
+
+static uint8_t GPS_IsHex(char ch)
+{
+    return (((ch >= '0') && (ch <= '9')) ||
+            ((ch >= 'A') && (ch <= 'F')) ||
+            ((ch >= 'a') && (ch <= 'f'))) ? 1U : 0U;
+}
+
+static uint8_t GPS_HexValue(char ch)
+{
+    if ((ch >= '0') && (ch <= '9')) {
+        return (uint8_t)(ch - '0');
+    }
+
+    if ((ch >= 'A') && (ch <= 'F')) {
+        return (uint8_t)(ch - 'A' + 10);
+    }
+
+    return (uint8_t)(ch - 'a' + 10);
+}
+
+static uint8_t GPS_ChecksumValid(const char *line)
+{
+    const char *p;
+    const char *star = NULL;
+    uint8_t checksum = 0U;
+    uint8_t received;
+
+    if ((line == NULL) || (line[0] != '$')) {
+        return 0U;
+    }
+
+    for (p = &line[1]; *p != '\0'; p++) {
+        if (*p == '*') {
+            star = p;
+            break;
+        }
+        checksum ^= (uint8_t)(*p);
+    }
+
+    if ((star == NULL) ||
+        (GPS_IsHex(star[1]) == 0U) ||
+        (GPS_IsHex(star[2]) == 0U)) {
+        return 0U;
+    }
+
+    received = (uint8_t)((GPS_HexValue(star[1]) << 4U) | GPS_HexValue(star[2]));
+
+    return (checksum == received) ? 1U : 0U;
+}
+
+static uint32_t GPS_SplitFields(char *line, char *fields[], uint32_t max_fields)
+{
+    char *p = line;
+    uint32_t field_count = 0U;
+
+    if ((line == NULL) || (fields == NULL) || (max_fields == 0U)) {
+        return 0U;
+    }
+
+    while ((field_count < max_fields) && (*p != '\0')) {
+        fields[field_count] = p;
+        field_count++;
+
+        while ((*p != '\0') && (*p != ',') && (*p != '*')) {
+            p++;
+        }
+
+        if (*p == ',') {
+            *p = '\0';
+            p++;
+        } else if (*p == '*') {
+            *p = '\0';
+            break;
+        }
+    }
+
+    return field_count;
+}
+
+#if GPS_USE_HAL_UART
+static void GPS_ClearUartErrors(void)
+{
+    __HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
+}
+#endif
 
 static uint8_t GPS_ReadLine(char *line, uint32_t line_size)
 {
 #if GPS_USE_HAL_UART
     uint8_t ch = 0U;
+    uint8_t in_sentence = 0U;
     uint32_t pos = 0U;
     uint32_t start_tick = HAL_GetTick();
 
@@ -33,6 +125,16 @@ static uint8_t GPS_ReadLine(char *line, uint32_t line_size)
 
     while ((HAL_GetTick() - start_tick) < GPS_UART_LINE_TIMEOUT_MS) {
         if (HAL_UART_Receive(&huart2, &ch, 1U, GPS_UART_CHAR_TIMEOUT_MS) != HAL_OK) {
+            GPS_ClearUartErrors();
+            continue;
+        }
+
+        if (ch == '$') {
+            pos = 0U;
+            in_sentence = 1U;
+        }
+
+        if (in_sentence == 0U) {
             continue;
         }
 
@@ -52,6 +154,9 @@ static uint8_t GPS_ReadLine(char *line, uint32_t line_size)
         if (pos < (line_size - 1U)) {
             line[pos] = (char)ch;
             pos++;
+        } else {
+            pos = 0U;
+            in_sentence = 0U;
         }
     }
 
@@ -68,11 +173,6 @@ static uint8_t GPS_ReadLine(char *line, uint32_t line_size)
 #endif
 }
 
-static uint8_t GPS_IsDigit(char ch)
-{
-    return ((ch >= '0') && (ch <= '9')) ? 1U : 0U;
-}
-
 static uint8_t GPS_ParseCoordinate(const char *value, const char *hemisphere, float *coordinate)
 {
     uint32_t whole = 0U;
@@ -82,6 +182,7 @@ static uint8_t GPS_ParseCoordinate(const char *value, const char *hemisphere, fl
     uint32_t minute_whole;
     uint32_t minute_scaled;
     uint32_t divisor;
+    uint32_t max_degrees;
     int32_t coordinate_scaled;
     uint8_t saw_digit = 0U;
 
@@ -113,14 +214,30 @@ static uint8_t GPS_ParseCoordinate(const char *value, const char *hemisphere, fl
     minute_whole = whole % 100U;
     minute_scaled = (minute_whole * fraction_scale) + fraction;
     divisor = 60U * fraction_scale;
+
+    if (minute_whole >= 60U) {
+        return 0U;
+    }
+
+    if ((hemisphere[0] == 'N') || (hemisphere[0] == 'S')) {
+        max_degrees = 90U;
+    } else if ((hemisphere[0] == 'E') || (hemisphere[0] == 'W')) {
+        max_degrees = 180U;
+    } else {
+        return 0U;
+    }
+
+    if ((degrees > max_degrees) ||
+        ((degrees == max_degrees) && (minute_scaled != 0U))) {
+        return 0U;
+    }
+
     coordinate_scaled = (int32_t)((degrees * (uint32_t)GPS_COORD_SCALE) +
                                   (((uint64_t)minute_scaled * (uint32_t)GPS_COORD_SCALE +
                                    (divisor / 2U)) / divisor));
 
     if ((hemisphere[0] == 'S') || (hemisphere[0] == 'W')) {
         coordinate_scaled = -coordinate_scaled;
-    } else if ((hemisphere[0] != 'N') && (hemisphere[0] != 'E')) {
-        return 0U;
     }
 
     *coordinate = (float)coordinate_scaled / (float)GPS_COORD_SCALE;
@@ -130,14 +247,7 @@ static uint8_t GPS_ParseCoordinate(const char *value, const char *hemisphere, fl
 static uint8_t GPS_ParseRmc(char *line, GpsLocation *location)
 {
     char *fields[13] = {0};
-    uint32_t field_count = 0U;
-    char *token = strtok(line, ",");
-
-    while ((token != NULL) && (field_count < (sizeof(fields) / sizeof(fields[0])))) {
-        fields[field_count] = token;
-        field_count++;
-        token = strtok(NULL, ",");
-    }
+    uint32_t field_count = GPS_SplitFields(line, fields, (uint32_t)(sizeof(fields) / sizeof(fields[0])));
 
     if ((field_count < 7U) || (fields[2][0] != 'A')) {
         return 0U;
@@ -155,14 +265,7 @@ static uint8_t GPS_ParseRmc(char *line, GpsLocation *location)
 static uint8_t GPS_ParseGga(char *line, GpsLocation *location)
 {
     char *fields[10] = {0};
-    uint32_t field_count = 0U;
-    char *token = strtok(line, ",");
-
-    while ((token != NULL) && (field_count < (sizeof(fields) / sizeof(fields[0])))) {
-        fields[field_count] = token;
-        field_count++;
-        token = strtok(NULL, ",");
-    }
+    uint32_t field_count = GPS_SplitFields(line, fields, (uint32_t)(sizeof(fields) / sizeof(fields[0])));
 
     if ((field_count < 7U) || (fields[6][0] == '0')) {
         return 0U;
@@ -182,6 +285,9 @@ static uint8_t GPS_ParseNmea(const char *line, GpsLocation *location)
     char work[GPS_NMEA_LINE_MAX];
 
     (void)snprintf(work, sizeof(work), "%s", line);
+    if (GPS_ChecksumValid(work) == 0U) {
+        return 0U;
+    }
 
     if ((strncmp(work, "$GNRMC", 6) == 0) || (strncmp(work, "$GPRMC", 6) == 0)) {
         return GPS_ParseRmc(work, location);
@@ -216,6 +322,8 @@ GpsLocation GPS_GetLocation(void)
     char line[GPS_NMEA_LINE_MAX];
     GpsLocation location = last_location;
     int tries;
+
+    location.valid = 0U;
 
     /* 循环读 3 行 NMEA，找到有效定位即停止 */
     for (tries = 0; tries < 3; tries++) {

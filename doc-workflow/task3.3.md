@@ -51,9 +51,9 @@ printf("[MQTT] subscribed cargo/cmd\n");
 
 ### 3. 状态机等待窗口
 
-- `STATE_WAIT_CLOUD` 等待云命令时间从 5s 调整为 30s。
+- 云命令改为 `Task_4G_MQTT` 异步处理，收到后立即执行声光动作。
 - `Task_4G_MQTT` 轮询周期从 4s 调整为 1s。
-- 目的：给 dashboard 按钮下发和 MQTT PUBLISH 接收留出足够窗口，避免状态机过早 `cloud action: NONE` 并关断 Air780E。
+- 目的：避免 dashboard 按钮下发后命令被 `STATE_WAIT_CLOUD` 窗口错过或被队列清空。
 
 ### 4. 备用简化方案
 
@@ -121,7 +121,7 @@ AppCloudCommand MQTT_PollCommand(void)
 
 - ✅ `test1/Core/Src/air780e/mqtt.c` 已删除真实 UART 模式下的 stub 轮转 fallback
 - ✅ 当前实现使用 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()` 解析 PUBLISH payload 或 raw/CIPRXGET 返回内容
-- ✅ `STATE_WAIT_CLOUD` 已改为 30s，`Task_4G_MQTT` 已改为 1s 轮询
+- ✅ `Task_4G_MQTT` 已改为 1s 轮询，并异步执行云端声光指令
 - ✅ MinGW `gcc -fsyntax-only` 对 `mqtt.c` 语法检查通过（仅 CMSIS 在 x86 下的指针宽度 warning）
 - ✅ `dashboard.html` 自动重连机制已验证（`mqtt.js` reconnect 事件）
 - ⚠️ 当前工作区缺少 `test1/test1.ioc` 和 `test1/MDK-ARM/test1.uvprojx`，无法运行 UV4 Keil 构建；需先从本地/团队工程恢复 CubeMX/Keil 工程文件，再执行完整编译验证
@@ -137,14 +137,14 @@ AppCloudCommand MQTT_PollCommand(void)
 
 - 当前代码：`test1/Core/Src/air780e/mqtt.c`（`MQTT_PollCommand` 函数）
 - 命令解析：`mqtt.c` 中 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()`
-- 状态机处理：`app.c` 中 `STATE_WAIT_CLOUD` 段
+- 应用处理：`app.c` 中 `App_Task4GMQTT()` / `handle_cloud_command()`
 - 前端日志：`doc-workflow/log3.3.md`
 ---
 
 ## 2026-07-09 补充：云指令设备动作 + GPS 精度修复
 
 - `dashboard.html` 按钮仍发送英文命令码：`HOLD` / `RETURN` / `CONTINUE`，按钮文案分别显示为「暂留 / 退货 / 继续运输」。
-- `app.c` 现在在 `STATE_WAIT_CLOUD` 真正等待 `APP_CLOUD_WAIT_MS = 30000U`，不再只等待 2s 队列消息；等待期间仍可响应 NFC 关机。
+- `app.c` 现在由 `Task_4G_MQTT` 异步执行云端声光动作；`STATE_WAIT_CLOUD` 只保留状态显示和 NFC 关机检查。
 - 云指令动作已落到 `Alarm` 模块：
   - `HOLD`：LED2 常亮，蜂鸣器关闭。
   - `RETURN`：触发报警，LED2 快闪，蜂鸣器随快闪鸣叫。
@@ -152,3 +152,18 @@ AppCloudCommand MQTT_PollCommand(void)
 - `gps.c` 坐标解析从 `atof()` 浮点解析改为 NMEA 定点微度解析，保留到 6 位小数后再写入 `GpsLocation`，并继续由 MQTT payload 输出 `lat/lon` 6 位小数。
 - 代码侧已用 MinGW `gcc -fsyntax-only` 检查 `app.c` / `alarm.c` / `gps.c`；仅剩 CMSIS 在 x86 检查环境下的指针宽度 warning。
 - 当前仍缺少 `test1/test1.ioc` 和 `test1/MDK-ARM/test1.uvprojx`，所以不能声明 UV4/Keil 全量构建已验证。
+
+---
+
+## 2026-07-09 补充 2：云指令改为异步声光控制
+
+> 本段覆盖上方“STATE_WAIT_CLOUD 等待命令”的旧说明。
+
+- 根因：云指令原先先进入 `queue_cloud_cmd`，再等待状态机进入 `STATE_WAIT_CLOUD` 后消费；而状态机在上传前会清空该队列，导致用户在暂留后继续点击“退货/继续运输”时，命令可能被清掉或错过窗口。
+- 当前实现：`App_Task4GMQTT()` 每 1s 调用 `MQTT_PollCommand()`，一旦收到 `HOLD` / `RETURN` / `CONTINUE`，立即调用 `handle_cloud_command()` 更新 `Alarm` 模块，不再依赖 `STATE_WAIT_CLOUD` 队列窗口。
+- `STATE_WAIT_CLOUD` 现在只保留短暂状态显示和 NFC 关机检查，不再消费云命令，也不再打印误导性的 `cloud action: NONE`。
+- 三个云端动作保持为：
+  - `HOLD`：LD2 黄灯常亮，蜂鸣器关闭。
+  - `RETURN`：LD2 黄灯快闪，蜂鸣器响 15s。
+  - `CONTINUE`：LD2 黄灯恢复正常心跳闪烁，蜂鸣器关闭。
+- GPS、SHT31 温湿度、MQTT 上报、Flash 缓存流程不因云指令改变；云指令只改变上述声光状态。

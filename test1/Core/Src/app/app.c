@@ -16,9 +16,8 @@
 
 extern osMessageQueueId_t queue_activationHandle;
 extern osMessageQueueId_t queue_sensor_dataHandle;
-extern osMessageQueueId_t queue_cloud_cmdHandle;
 
-#define APP_CLOUD_WAIT_MS 2000U    /* 后台 Task_4G 持续轮询，这里只检查已排队的 */
+#define APP_CLOUD_WAIT_MS 2000U
 #define APP_MQTT_POLL_MS 1000U
 #define APP_RETURN_BUZZER_MS 15000U
 #define APP_ENV_SCALE 10L
@@ -221,36 +220,23 @@ void App_TaskStateMachine(void)
 
             /* ---- MQTT 上传 ---- */
             StateMachine_Set(STATE_UPLOAD);
-            reset_queue(queue_cloud_cmdHandle);
             HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
             if (MQTT_PublishTelemetry(&telemetry) == 0U) {
                 (void)W25Q128_WriteTelemetry(&telemetry);
             }
             HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_RESET);
 
-            /* ---- 云指令（2s 超时） ---- */
+            /* 云指令由 Task_4G_MQTT 异步处理；这里仅保留状态显示和 NFC 关机窗口。 */
             {
-                uint16_t cmd = APP_CLOUD_CMD_NONE;
-                uint8_t cmd_received = 0U;
                 uint32_t t0 = osKernelGetTickCount();
 
                 StateMachine_Set(STATE_WAIT_CLOUD);
                 while ((osKernelGetTickCount() - t0) < APP_CLOUD_WAIT_MS) {
-                    if (osMessageQueueGet(queue_cloud_cmdHandle, &cmd, NULL, 500) == osOK) {
-                        cmd_received = 1U;
-                        break;
-                    }
                     if (osMessageQueueGet(queue_activationHandle,
-                                          &activation_event, NULL, 0) == osOK) {
+                                          &activation_event, NULL, 500) == osOK) {
                         printf("[StateMachine] NFC shutdown during WAIT_CLOUD\n");
                         goto nfc_shutdown;
                     }
-                }
-
-                if (cmd_received != 0U) {
-                    handle_cloud_command((AppCloudCommand)cmd);
-                } else {
-                    handle_cloud_command(APP_CLOUD_CMD_NONE);
                 }
             }
 
@@ -370,8 +356,7 @@ void App_Task4GMQTT(void)
         AppCloudCommand command = MQTT_PollCommand();
 
         if (command != APP_CLOUD_CMD_NONE) {
-            uint16_t command_value = (uint16_t)command;
-            (void)osMessageQueuePut(queue_cloud_cmdHandle, &command_value, 0, 0);
+            handle_cloud_command(command);
         }
 
         osDelay(APP_MQTT_POLL_MS);
