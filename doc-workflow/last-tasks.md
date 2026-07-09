@@ -63,8 +63,9 @@
 | 优先级 | 编号 | 问题 | 负责人 | 状态 |
 |:---:|:---:|------|:---:|:---:|
 | P0 | #1,#2 | USART1 互斥锁 + DMA/中断接收 | B | ❌ |
-| P0 | #3 | TCP_SendBinary 验证 SEND OK | B | ✅ 已修 (c471d90) |
+| P0 | #3 | TCP_SendBinary 验证 SEND OK | B | ✅ 已修 |
 | P0 | #4 | CONNACK 返回码检查 | B | ❌ |
+| P0 | - | CSQ 加入 telemetry | B | ✅ 已修 (16d426d) |
 | P1 | #5,#6 | W25Q128 重启不擦除 + 补上传路径 | A | ❌ |
 | P1 | #7 | printf 加互斥锁 | C | ❌ |
 | P1 | #8 | HAL_Delay → osDelay 全局替换（5 处） | A/B/C | ❌ |
@@ -82,6 +83,8 @@
 - [ ] sht31/pn532 HAL_Delay → osDelay（review #8）
 
 ### B（通信层）
+- [x] **CSQ 加入 telemetry** ✅ (16d426d)
+- [x] PDP 激活 + 上报周期优化 ✅ (16d426d)
 - [ ] GPS 户外真坐标测试（2.3）
 - [ ] **USART1 DMA/中断接收 + 互斥锁**（review #1,#2）— 最重要
 - [ ] CONNACK 返回码检查（review #4）
@@ -91,14 +94,21 @@
 - [ ] mqtt HAL_Delay → osDelay（review #8）
 
 ### C（应用层 + 前端 + 文档）
-- [ ] **printf 加互斥锁**（review #7）— 15 分钟
-- [ ] **Stop Mode 实现**（task 4.1）
-- [ ] 功耗测量（task 4.2）
-- [ ] power.c HAL_Delay → osDelay（review #8）
-- [ ] 死代码清理（review #20,#21）
-- [ ] 报告 PDF 导出（task 5.3）
+
+**✅ 已完成：**
+- [x] dashboard 自动重连 + 地图定位 + 移动端修复
+- [x] 三页面统一 footer 跳转
+- [x] 代码全面审查报告 (29 问题)
+- [x] task5 产出物对齐 demand.md
+- [x] doc-workflow 目录整理
+
+**❌ C 代码阻塞（队友在改，不碰）：**
+- [ ] printf 互斥锁、HAL_Delay→osDelay、Stop Mode、死代码
+
+**📋 可做：**
+- [ ] 报告 print 样式 → 导出 PDF（task 5.3）— 缺实物照片
 - [ ] 代码 RAR 打包（task 5.5）
-- [ ] 等队友完成后拍视频（task 5.4）
+- [ ] 视频（task 5.4）— 等硬件
 
 ---
 
