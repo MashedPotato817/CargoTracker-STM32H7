@@ -1,7 +1,6 @@
 #include "gps/gps.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #if GPS_USE_HAL_UART
@@ -12,6 +11,7 @@
 #define GPS_UART_CHAR_TIMEOUT_MS 20U
 #define GPS_UART_LINE_TIMEOUT_MS 1200U
 #define GPS_UART_BAUDRATE 9600U
+#define GPS_COORD_SCALE 1000000L
 
 static GpsLocation last_location = {0.0f, 0.0f, 0U};  /* valid=0 直到真定位 */
 
@@ -68,18 +68,63 @@ static uint8_t GPS_ReadLine(char *line, uint32_t line_size)
 #endif
 }
 
-static float GPS_ParseCoordinate(const char *value, const char *hemisphere)
+static uint8_t GPS_IsDigit(char ch)
 {
-    float raw = (float)atof(value);
-    int degrees = (int)(raw / 100.0f);
-    float minutes = raw - ((float)degrees * 100.0f);
-    float coordinate = (float)degrees + (minutes / 60.0f);
+    return ((ch >= '0') && (ch <= '9')) ? 1U : 0U;
+}
 
-    if ((hemisphere[0] == 'S') || (hemisphere[0] == 'W')) {
-        coordinate = -coordinate;
+static uint8_t GPS_ParseCoordinate(const char *value, const char *hemisphere, float *coordinate)
+{
+    uint32_t whole = 0U;
+    uint32_t fraction = 0U;
+    uint32_t fraction_scale = 1U;
+    uint32_t degrees;
+    uint32_t minute_whole;
+    uint32_t minute_scaled;
+    uint32_t divisor;
+    int32_t coordinate_scaled;
+    uint8_t saw_digit = 0U;
+
+    if ((value == NULL) || (hemisphere == NULL) || (coordinate == NULL) ||
+        (value[0] == '\0') || (hemisphere[0] == '\0')) {
+        return 0U;
     }
 
-    return coordinate;
+    while (GPS_IsDigit(*value) != 0U) {
+        whole = (whole * 10U) + (uint32_t)(*value - '0');
+        saw_digit = 1U;
+        value++;
+    }
+
+    if (*value == '.') {
+        value++;
+        while ((GPS_IsDigit(*value) != 0U) && (fraction_scale < 1000000U)) {
+            fraction = (fraction * 10U) + (uint32_t)(*value - '0');
+            fraction_scale *= 10U;
+            value++;
+        }
+    }
+
+    if (saw_digit == 0U) {
+        return 0U;
+    }
+
+    degrees = whole / 100U;
+    minute_whole = whole % 100U;
+    minute_scaled = (minute_whole * fraction_scale) + fraction;
+    divisor = 60U * fraction_scale;
+    coordinate_scaled = (int32_t)((degrees * (uint32_t)GPS_COORD_SCALE) +
+                                  (((uint64_t)minute_scaled * (uint32_t)GPS_COORD_SCALE +
+                                   (divisor / 2U)) / divisor));
+
+    if ((hemisphere[0] == 'S') || (hemisphere[0] == 'W')) {
+        coordinate_scaled = -coordinate_scaled;
+    } else if ((hemisphere[0] != 'N') && (hemisphere[0] != 'E')) {
+        return 0U;
+    }
+
+    *coordinate = (float)coordinate_scaled / (float)GPS_COORD_SCALE;
+    return 1U;
 }
 
 static uint8_t GPS_ParseRmc(char *line, GpsLocation *location)
@@ -98,8 +143,10 @@ static uint8_t GPS_ParseRmc(char *line, GpsLocation *location)
         return 0U;
     }
 
-    location->latitude = GPS_ParseCoordinate(fields[3], fields[4]);
-    location->longitude = GPS_ParseCoordinate(fields[5], fields[6]);
+    if ((GPS_ParseCoordinate(fields[3], fields[4], &location->latitude) == 0U) ||
+        (GPS_ParseCoordinate(fields[5], fields[6], &location->longitude) == 0U)) {
+        return 0U;
+    }
     location->valid = 1U;
 
     return 1U;
@@ -121,8 +168,10 @@ static uint8_t GPS_ParseGga(char *line, GpsLocation *location)
         return 0U;
     }
 
-    location->latitude = GPS_ParseCoordinate(fields[2], fields[3]);
-    location->longitude = GPS_ParseCoordinate(fields[4], fields[5]);
+    if ((GPS_ParseCoordinate(fields[2], fields[3], &location->latitude) == 0U) ||
+        (GPS_ParseCoordinate(fields[4], fields[5], &location->longitude) == 0U)) {
+        return 0U;
+    }
     location->valid = 1U;
 
     return 1U;

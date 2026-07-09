@@ -139,3 +139,16 @@ AppCloudCommand MQTT_PollCommand(void)
 - 命令解析：`mqtt.c` 中 `MQTT_ParsePublishBuffer()` / `MQTT_ParseCommandBytes()`
 - 状态机处理：`app.c` 中 `STATE_WAIT_CLOUD` 段
 - 前端日志：`doc-workflow/log3.3.md`
+---
+
+## 2026-07-09 补充：云指令设备动作 + GPS 精度修复
+
+- `dashboard.html` 按钮仍发送英文命令码：`HOLD` / `RETURN` / `CONTINUE`，按钮文案分别显示为「暂留 / 退货 / 继续运输」。
+- `app.c` 现在在 `STATE_WAIT_CLOUD` 真正等待 `APP_CLOUD_WAIT_MS = 30000U`，不再只等待 2s 队列消息；等待期间仍可响应 NFC 关机。
+- 云指令动作已落到 `Alarm` 模块：
+  - `HOLD`：LED2 常亮，蜂鸣器关闭。
+  - `RETURN`：触发报警，LED2 快闪，蜂鸣器随快闪鸣叫。
+  - `CONTINUE`：清除云端报警动作，LED2 恢复正常心跳闪烁。
+- `gps.c` 坐标解析从 `atof()` 浮点解析改为 NMEA 定点微度解析，保留到 6 位小数后再写入 `GpsLocation`，并继续由 MQTT payload 输出 `lat/lon` 6 位小数。
+- 代码侧已用 MinGW `gcc -fsyntax-only` 检查 `app.c` / `alarm.c` / `gps.c`；仅剩 CMSIS 在 x86 检查环境下的指针宽度 warning。
+- 当前仍缺少 `test1/test1.ioc` 和 `test1/MDK-ARM/test1.uvprojx`，所以不能声明 UV4/Keil 全量构建已验证。

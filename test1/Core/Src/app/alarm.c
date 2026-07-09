@@ -17,6 +17,10 @@ static uint8_t led_on = 0;
 static uint32_t last_toggle_tick = 0;
 static uint8_t system_active = 0;
 static uint8_t debounce_cnt = 0;
+static AlarmLedMode led_mode = ALARM_LED_MODE_NORMAL;
+static AlarmLedMode last_reported_mode = (AlarmLedMode)0xFF;
+static uint8_t buzzer_timed_active = 0U;
+static uint32_t buzzer_stop_tick = 0U;
 
 void Alarm_Init(void)
 {
@@ -24,6 +28,10 @@ void Alarm_Init(void)
     last_reported = 0xFF;
     led_on = 0;
     last_toggle_tick = 0;
+    led_mode = ALARM_LED_MODE_NORMAL;
+    last_reported_mode = (AlarmLedMode)0xFF;
+    buzzer_timed_active = 0U;
+    buzzer_stop_tick = 0U;
     HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_RESET);
 #ifdef BUZZER_Pin
     /* 蜂鸣器接法: 3.3V -- 蜂鸣器 -- PC8，HIGH=关 LOW=响 */
@@ -68,10 +76,52 @@ void Alarm_SetActive(uint8_t active)
     if (!active) debounce_cnt = 0;
 }
 
+void Alarm_SetLedMode(AlarmLedMode mode)
+{
+    led_mode = mode;
+    last_toggle_tick = 0U;
+
+    if (mode == ALARM_LED_MODE_HOLD_ON) {
+        buzzer_timed_active = 0U;
+        led_on = 1U;
+        HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_SET);
+#ifdef BUZZER_Pin
+        HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+#endif
+    } else if (mode == ALARM_LED_MODE_NORMAL) {
+        buzzer_timed_active = 0U;
+#ifdef BUZZER_Pin
+        HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+#endif
+    }
+}
+
+void Alarm_StartBuzzer(uint32_t duration_ms)
+{
+#ifdef BUZZER_Pin
+    if (duration_ms == 0U) {
+        buzzer_timed_active = 0U;
+        HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+        return;
+    }
+
+    buzzer_timed_active = 1U;
+    buzzer_stop_tick = osKernelGetTickCount() + duration_ms;
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
+#else
+    (void)duration_ms;
+#endif
+}
+
 void Alarm_SetSystemActive(uint8_t active)
 {
     system_active = active ? 1U : 0U;
     if (!system_active) {
+        alarm_active = 0U;
+        debounce_cnt = 0U;
+        led_mode = ALARM_LED_MODE_NORMAL;
+        led_on = 0U;
+        buzzer_timed_active = 0U;
         /* 系统休眠 → 关闭所有指示灯和蜂鸣器 */
         HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_RESET);
 #ifdef BUZZER_Pin
@@ -90,7 +140,27 @@ void Alarm_Task(void)
     }
 
     uint32_t now_tick = osKernelGetTickCount();
-    uint32_t interval_ms = alarm_active ? ALARM_LED_ACTIVE_MS : ALARM_LED_HEARTBEAT_MS;
+    uint8_t fast_blink = ((alarm_active != 0U) || (led_mode == ALARM_LED_MODE_FAST_BLINK)) ? 1U : 0U;
+    uint32_t interval_ms = fast_blink ? ALARM_LED_ACTIVE_MS : ALARM_LED_HEARTBEAT_MS;
+
+#ifdef BUZZER_Pin
+    if ((buzzer_timed_active != 0U) && ((int32_t)(now_tick - buzzer_stop_tick) >= 0)) {
+        buzzer_timed_active = 0U;
+        HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
+    }
+#endif
+
+    if (led_mode == ALARM_LED_MODE_HOLD_ON) {
+        if (led_on == 0U) {
+            led_on = 1U;
+            HAL_GPIO_WritePin(LD2_YELLOW_GPIO_Port, LD2_YELLOW_Pin, GPIO_PIN_SET);
+        }
+        if (last_reported_mode != led_mode) {
+            printf("[Alarm] LED2 HOLD ON\n");
+            last_reported_mode = led_mode;
+        }
+        return;
+    }
 
     if ((now_tick - last_toggle_tick) >= interval_ms) {
         last_toggle_tick = now_tick;
@@ -101,12 +171,15 @@ void Alarm_Task(void)
 #ifdef BUZZER_Pin
         /* 3.3V--蜂鸣器--PC8: LOW=响 HIGH=关 */
         HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin,
-                          (alarm_active && led_on) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+                          ((buzzer_timed_active != 0U) ||
+                           ((alarm_active != 0U) && (led_mode == ALARM_LED_MODE_NORMAL) && led_on)) ?
+                          GPIO_PIN_RESET : GPIO_PIN_SET);
 #endif
     }
 
-    if (last_reported != alarm_active) {
-        printf("[Alarm] %s\n", alarm_active ? "FAST BLINK" : "SLOW HEARTBEAT");
-        last_reported = alarm_active;
+    if ((last_reported != fast_blink) || (last_reported_mode != led_mode)) {
+        printf("[Alarm] %s\n", fast_blink ? "FAST BLINK" : "SLOW HEARTBEAT");
+        last_reported = fast_blink;
+        last_reported_mode = led_mode;
     }
 }

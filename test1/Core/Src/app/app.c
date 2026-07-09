@@ -20,6 +20,7 @@ extern osMessageQueueId_t queue_cloud_cmdHandle;
 
 #define APP_CLOUD_WAIT_MS 30000U
 #define APP_MQTT_POLL_MS 1000U
+#define APP_RETURN_BUZZER_MS 15000U
 #define APP_ENV_SCALE 10L
 #define APP_COORD_SCALE 1000000L
 
@@ -59,12 +60,19 @@ static void handle_cloud_command(AppCloudCommand command)
     switch (command) {
     case APP_CLOUD_CMD_HOLD:
         printf("[StateMachine] cloud action: HOLD\n");
+        Alarm_SetActive(0);
+        Alarm_SetLedMode(ALARM_LED_MODE_HOLD_ON);
         break;
     case APP_CLOUD_CMD_RETURN:
         printf("[StateMachine] cloud action: RETURN\n");
+        Alarm_SetActive(1);
+        Alarm_SetLedMode(ALARM_LED_MODE_FAST_BLINK);
+        Alarm_StartBuzzer(APP_RETURN_BUZZER_MS);
         break;
     case APP_CLOUD_CMD_CONTINUE:
         printf("[StateMachine] cloud action: CONTINUE\n");
+        Alarm_SetActive(0);
+        Alarm_SetLedMode(ALARM_LED_MODE_NORMAL);
         break;
     default:
         printf("[StateMachine] cloud action: NONE\n");
@@ -108,7 +116,6 @@ void App_SendActivationFromISR(uint16_t event)
 void App_TaskStateMachine(void)
 {
     uint16_t activation_event = 0;
-    uint16_t cloud_value = APP_CLOUD_CMD_NONE;
     uint32_t idle_log_tick = 0U;
 
     printf("[SM] task started (Air780E OFF, waiting NFC)\n");
@@ -145,7 +152,6 @@ void App_TaskStateMachine(void)
         /* === Air780E 在线，定时上报（10s/次），NFC 刷卡关机 === */
         for (;;) {
             TelemetryData telemetry = {0};
-            AppSensorPacket packet = {0};
 
             /* ---- GPS ---- */
             StateMachine_Set(STATE_GPS_LOCATE);
@@ -211,6 +217,7 @@ void App_TaskStateMachine(void)
 
             /* ---- MQTT 上传 ---- */
             StateMachine_Set(STATE_UPLOAD);
+            reset_queue(queue_cloud_cmdHandle);
             HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
             if (MQTT_PublishTelemetry(&telemetry) == 0U) {
                 (void)W25Q128_WriteTelemetry(&telemetry);
@@ -218,11 +225,28 @@ void App_TaskStateMachine(void)
             HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_RESET);
 
             /* ---- 云指令（2s 超时） ---- */
-            reset_queue(queue_cloud_cmdHandle);
             {
                 uint16_t cmd = APP_CLOUD_CMD_NONE;
-                if (osMessageQueueGet(queue_cloud_cmdHandle, &cmd, NULL, 2000) == osOK) {
+                uint8_t cmd_received = 0U;
+                uint32_t t0 = osKernelGetTickCount();
+
+                StateMachine_Set(STATE_WAIT_CLOUD);
+                while ((osKernelGetTickCount() - t0) < APP_CLOUD_WAIT_MS) {
+                    if (osMessageQueueGet(queue_cloud_cmdHandle, &cmd, NULL, 500) == osOK) {
+                        cmd_received = 1U;
+                        break;
+                    }
+                    if (osMessageQueueGet(queue_activationHandle,
+                                          &activation_event, NULL, 0) == osOK) {
+                        printf("[StateMachine] NFC shutdown during WAIT_CLOUD\n");
+                        goto nfc_shutdown;
+                    }
+                }
+
+                if (cmd_received != 0U) {
                     handle_cloud_command((AppCloudCommand)cmd);
+                } else {
+                    handle_cloud_command(APP_CLOUD_CMD_NONE);
                 }
             }
 
