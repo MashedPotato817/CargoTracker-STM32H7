@@ -168,14 +168,14 @@ GpsLocation GPS_GetLocation(void)
     GpsLocation location = last_location;
     int tries;
 
-    /* 循环读，直到找到有效的 RMC/GGA 句 */
-    for (tries = 0; tries < 10; tries++) {
+    /* 循环读 3 行 NMEA，找到有效定位即停止 */
+    for (tries = 0; tries < 3; tries++) {
         if (GPS_ReadLine(line, sizeof(line)) == 0U) {
-            break;  /* 超时无数据 */
+            break;
         }
         if (GPS_ParseNmea(line, &location) != 0U) {
             last_location = location;
-            break;
+            return location;  /* 立即返回真数据 */
         }
     }
 
