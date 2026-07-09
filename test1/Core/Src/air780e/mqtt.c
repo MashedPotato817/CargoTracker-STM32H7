@@ -346,12 +346,13 @@ static void MQTT_BuildTelemetryPayload(const TelemetryData *telemetry, char *pay
 
     (void)snprintf(payload,
                    payload_size,
-                   "{\"temp\":%s,\"hum\":%s,\"lat\":%s,\"lon\":%s,\"gps_valid\":%u}",
+                   "{\"temp\":%s,\"hum\":%s,\"lat\":%s,\"lon\":%s,\"gps_valid\":%u,\"csq\":%u}",
                    temp_text,
                    hum_text,
                    lat_text,
                    lon_text,
-                   telemetry->gps.valid);
+                   telemetry->gps.valid,
+                   Air780E_SignalQuality());
 }
 
 static uint8_t MQTT_BufferContains(const uint8_t *buf, uint32_t len, const char *needle)
@@ -513,6 +514,16 @@ void MQTT_Init(void)
 
 #if AIR780E_USE_HAL_UART
     printf("[MQTT] init: Air780E TCP MQTT stack\n");
+
+    /* Step 0: 激活 PDP 上下文 */
+    if (TCP_SendAT("AT+CGACT=1,1", "OK", 3000U) == 0U) {
+        printf("[MQTT] PDP activate failed\n");
+        mqtt_ready = 0U;
+        return;
+    }
+
+    /* 清干净旧的 TCP 连接 */
+    (void)TCP_SendAT("AT+CIPSHUT", "SHUT OK", 3000U);
 
     /* Step 1: 开 TCP 连接 */
     (void)snprintf(cmd, sizeof(cmd),

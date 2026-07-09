@@ -9,5 +9,6 @@
 
 void Air780E_Init(void);
 uint8_t Air780E_IsNetworkReady(void);
+uint8_t Air780E_SignalQuality(void);
 
 #endif

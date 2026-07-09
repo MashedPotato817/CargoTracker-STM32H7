@@ -168,3 +168,8 @@ uint8_t Air780E_IsNetworkReady(void)
 {
     return network_ready;
 }
+
+uint8_t Air780E_SignalQuality(void)
+{
+    return signal_quality;
+}

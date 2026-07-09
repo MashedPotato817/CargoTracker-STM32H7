@@ -18,7 +18,7 @@ extern osMessageQueueId_t queue_activationHandle;
 extern osMessageQueueId_t queue_sensor_dataHandle;
 extern osMessageQueueId_t queue_cloud_cmdHandle;
 
-#define APP_CLOUD_WAIT_MS 30000U
+#define APP_CLOUD_WAIT_MS 2000U    /* 后台 Task_4G 持续轮询，这里只检查已排队的 */
 #define APP_MQTT_POLL_MS 1000U
 #define APP_RETURN_BUZZER_MS 15000U
 #define APP_ENV_SCALE 10L
@@ -254,11 +254,11 @@ void App_TaskStateMachine(void)
                 }
             }
 
-            /* 等 10 秒，期间检查 NFC 关机 */
-            printf("[StateMachine] next report in 10s (NFC to power off)\n");
+            /* 等 5 秒（总上报周期 ~10s），期间检查 NFC 关机 */
+            printf("[StateMachine] next report in 5s (NFC to power off)\n");
             {
                 uint32_t t0 = osKernelGetTickCount();
-                while ((osKernelGetTickCount() - t0) < 10000U) {
+                while ((osKernelGetTickCount() - t0) < 5000U) {
                     if (osMessageQueueGet(queue_activationHandle,
                                           &activation_event, NULL, 500) == osOK) {
                         printf("[StateMachine] NFC received, Air780E OFF\n");
