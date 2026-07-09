@@ -37,6 +37,12 @@
   }
   .card.warn { border-left: 3px solid var(--warn); }
   .card.good { border-left: 3px solid var(--good); }
+  /* nav */
+  .top-nav { display:flex; justify-content:space-between; align-items:center; padding:8px 0; margin-bottom:12px; border-bottom:1px solid var(--border); }
+  .top-nav .brand { font-weight:700; color:var(--head); text-decoration:none; font-size:0.95rem; }
+  .top-nav .links { display:flex; gap:14px; }
+  .top-nav .links a { color:var(--dim); text-decoration:none; font-size:0.82rem; }
+  .top-nav .links a.active { color:var(--accent); font-weight:600; }
 
   table {
     width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 10px 0;
@@ -91,6 +97,14 @@
 </style>
 </head>
 <body>
+<nav class="top-nav">
+  <a href="index.html" class="brand">CargoTracker</a>
+  <div class="links">
+    <a href="index.html" class="active">接线</a>
+    <a href="dashboard.html">控制台</a>
+    <a href="report.html">报告</a>
+  </div>
+</nav>
 
 <h1>🔧 CargoTracker 硬件接线指南</h1>
 <p style="color:var(--dim); font-size:0.82rem;">STM32H7A3ZI · NUCLEO-H7A3ZI-Q · 扫码在手机上查看</p>

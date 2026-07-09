@@ -91,31 +91,41 @@
 - [ ] mqtt HAL_Delay → osDelay（review #8）
 
 ### C（应用层 + 前端 + 文档）
-- [ ] **printf 加互斥锁**（review #7）— 15 分钟
-- [ ] **Stop Mode 实现**（task 4.1）
-- [ ] 功耗测量（task 4.2）
-- [ ] power.c HAL_Delay → osDelay（review #8）
-- [ ] 死代码清理（review #20,#21）
-- [ ] 报告 PDF 导出（task 5.3）
+
+**✅ 已完成（2026-07-09）：**
+- [x] dashboard 断线自动重连 + 状态反馈
+- [x] dashboard Leaflet 地图实时定位 + 华东范围锁定
+- [x] dashboard 移动端地图修复（CDN fallback + invalidateSize）
+- [x] 三页面统一导航栏（index / dashboard / report 互链）
+- [x] doc-workflow 目录整理（27→13 文件）
+- [x] 代码全面审查报告（29 个问题，P0-P3 修复建议）
+- [x] last-tasks.md 未完成任务入口
+- [x] task5 产出物对齐 demand.md（移除 PPT）
+
+**❌ 阻塞（不能动 C 代码，等 B 稳定）：**
+- [ ] printf 互斥锁、HAL_Delay → osDelay、Stop Mode、死代码清理
+- [ ] 功耗测量、4G 空闲断电
+
+**📋 可做（不动 C 代码）：**
+- [ ] 报告 print 样式 + 导出 PDF（task 5.3）— 缺实物照片
 - [ ] 代码 RAR 打包（task 5.5）
-- [ ] 等队友完成后拍视频（task 5.4）
+- [ ] 视频（task 5.4）— 等硬件跑通
+
+**🔧 B 待合并分支：**
+- `fix/csq-and-mobile-map` — CSQ 字段加入 telemetry（修复仪表盘 4G 信号 `--`）
 
 ---
 
 ## 七、建议执行顺序
 
 ```
-1. C: printf 互斥锁 (15min)                   ← 快速修复，所有人受益
-2. C: power.c HAL_Delay → osDelay (10min)      ← 解除 6.5s 阻塞
-3. B: USART1 DMA/中断 + 互斥锁 (3-4h)          ← 最关键通信修复
-4. A: W25Q128 修复 (3-4h)                       ← 断网缓存能真正工作
-5. A+B: 各自 HAL_Delay → osDelay                ← 5 处全局替换
-6. C: Stop Mode 实现 (1h)                       ← 论文数据 + 低功耗
-7. C: 功耗测量 (0.5h)                            ← 论文必须
-8. 全员: 系统联调 + 视频拍摄                     ← 产出物
-9. C: 报告导出 + 代码打包                        ← 提交
+1. B: USART1 DMA/中断 + 互斥锁                 ← 最关键通信修复
+2. A: W25Q128 修复                               ← 断网缓存能真正工作
+3. B: 合并 fix/csq-and-mobile-map（CSQ 字段）    ← 修复仪表盘信号显示
+4. 全员: 系统联调 → 拍视频                       ← 产出物
+5. C: 报告导出 + 代码打包                        ← 提交
 ```
 
 ---
 
-> 参考：`doc/code-review-20260709.md` | 生成时间：2026-07-09
+> 参考：`doc/code-review-20260709.md` | 更新：2026-07-09
