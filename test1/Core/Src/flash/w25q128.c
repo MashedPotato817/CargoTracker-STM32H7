@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "main.h"
+#include "air780e/mqtt.h"
 
 #if W25Q128_USE_HAL_SPI
 #include "spi.h"
@@ -236,6 +237,58 @@ uint8_t W25Q128_WriteTelemetry(const TelemetryData *telemetry)
     printf("[W25Q128] cache telemetry stub slot=%u\n", (unsigned int)write_slot);
 #endif
     return 1;
+}
+
+uint8_t W25Q128_FlushCache(void)
+{
+    uint8_t sent = 0;
+    uint32_t slot;
+    uint32_t addr;
+
+    printf("[W25Q128] flushing cached telemetry...\n");
+
+    for (slot = 0U; slot < W25Q128_TELEM_SLOTS; slot++) {
+        W25Q128TelemetryRecord record;
+        TelemetryData telemetry;
+
+        addr = W25Q128_TELEM_BASE_ADDR + (slot * W25Q128_TELEM_SLOT_SIZE);
+
+#if W25Q128_USE_HAL_SPI
+        w25q128_read_data(addr, (uint8_t *)&record, (uint16_t)sizeof(record));
+
+        if (record.magic != 0xA5C35A3CU) {
+            continue;
+        }
+
+        memset(&telemetry, 0, sizeof(telemetry));
+        telemetry.env.temperature_c = record.temperature_c;
+        telemetry.env.humidity_percent = record.humidity_percent;
+        telemetry.gps.latitude = record.latitude;
+        telemetry.gps.longitude = record.longitude;
+        telemetry.env.valid = record.env_valid;
+        telemetry.gps.valid = record.gps_valid;
+
+        printf("[W25Q128] retransmit slot %u T=%.0f H=%.0f lat=%.0f lon=%.0f\n",
+               (unsigned int)slot,
+               (double)record.temperature_c, (double)record.humidity_percent,
+               (double)record.latitude, (double)record.longitude);
+
+        if (MQTT_PublishTelemetry(&telemetry) != 0U) {
+            sent++;
+            /* 清除 magic 标记已发送 */
+            record.magic = 0U;
+            w25q128_sector_erase(addr);
+            w25q128_page_program(addr, (const uint8_t *)&record,
+                                 (uint16_t)sizeof(record));
+        }
+#else
+        (void)addr;
+        (void)telemetry;
+#endif
+    }
+
+    printf("[W25Q128] flush done: %u retransmitted\n", sent);
+    return sent;
 }
 
 void W25Q128_Task(void)
