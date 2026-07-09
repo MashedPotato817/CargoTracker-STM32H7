@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CargoTracker 云端控制台</title>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #0a0d14; --card: #131620; --border: #1e2230;
@@ -74,6 +76,26 @@ body {
 /* battery bar */
 .bar-wrap { height: 8px; background: var(--gauge-bg); border-radius: 4px; margin-top: 8px; }
 .bar-inner { height: 100%; border-radius: 4px; background: var(--good); transition: width 0.3s; }
+/* map */
+#map-container {
+  height: 240px; border-radius: 8px; overflow: hidden;
+  background: var(--gauge-bg);
+}
+.map-info {
+  display: flex; gap: 16px; margin-bottom: 8px; font-size: 0.78rem;
+}
+.map-info .item { display: flex; gap: 4px; }
+.map-info .label { color: var(--dim); }
+.map-info .val { color: var(--head); font-family: monospace; }
+/* Leaflet 暗色覆盖 */
+.leaflet-container { background: var(--gauge-bg); }
+.leaflet-control-zoom a {
+  background: var(--card); color: var(--head); border-color: var(--border);
+}
+.leaflet-control-attribution {
+  background: var(--card) !important; color: var(--dim) !important; font-size: 0.6rem !important;
+}
+.leaflet-control-attribution a { color: var(--accent) !important; }
 </style>
 </head>
 <body>
@@ -102,14 +124,15 @@ body {
     </div>
   </div>
 
-  <!-- GPS -->
+  <!-- GPS 地图 -->
   <div class="card">
     <h2>GPS 定位</h2>
-    <div class="gps-row">
-      <div class="gps-item"><div class="label">纬度</div><div class="val" id="lat-val">--</div></div>
-      <div class="gps-item"><div class="label">经度</div><div class="val" id="lon-val">--</div></div>
-      <div class="gps-item"><div class="label">有效</div><div class="val" id="gps-v">--</div></div>
+    <div class="map-info">
+      <div class="item"><span class="label">纬度</span><span class="val" id="lat-val">--</span></div>
+      <div class="item"><span class="label">经度</span><span class="val" id="lon-val">--</span></div>
+      <div class="item"><span class="label">定位</span><span class="val" id="gps-v">--</span></div>
     </div>
+    <div id="map-container"></div>
   </div>
 
   <!-- 信号 + 最后上报 -->
@@ -164,6 +187,56 @@ setInterval(() => {
     document.getElementById('last-seen').textContent = sec < 60 ? sec + 's 前' : min + 'm' + (sec % 60) + 's 前';
   }
 }, 2000);
+
+/* ---------- Leaflet 地图 ---------- */
+/* 华东范围：江浙沪 + 周边缓冲区 */
+const EAST_CHINA_BOUNDS = [[27.0, 116.0], [35.5, 123.0]];
+
+const map = L.map('map-container', {
+  attributionControl: false,
+  zoomControl: true,
+  fadeAnimation: false,       // 关闭瓦片淡入，消除色块闪烁
+  maxBounds: EAST_CHINA_BOUNDS,
+  maxBoundsViscosity: 0.8,    // 拖出边界时有阻力但不硬卡
+  minZoom: 7,
+}).setView([31.2, 120.5], 9); // 默认视野：长三角居中
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  noWrap: true,               // 不加载范围外瓦片
+  updateWhenIdle: false,      // 拖动/缩放时立即加载，不等空闲
+}).addTo(map);
+
+let deviceMarker = null;
+let firstFix = true;
+
+function updateMap(lat, lon, valid) {
+  if (!valid) {
+    if (deviceMarker) deviceMarker.setStyle({ fillColor: '#6b7280', color: '#6b7280' });
+    return;
+  }
+
+  const pos = [lat, lon];
+
+  if (!deviceMarker) {
+    deviceMarker = L.circleMarker(pos, {
+      radius: 8,
+      fillColor: '#4da6ff',
+      color: '#fff',
+      weight: 2,
+      fillOpacity: 0.9,
+    }).addTo(map);
+    deviceMarker.bindTooltip('设备位置', { offset: [0, -12] });
+  } else {
+    deviceMarker.setLatLng(pos);
+    deviceMarker.setStyle({ fillColor: '#4da6ff', color: '#fff' });
+  }
+
+  if (firstFix) {
+    map.setView(pos, 15, { animate: true });
+    firstFix = false;
+  }
+}
 
 const client = mqtt.connect(`wss://${BROKER}:${PORT}${PATH}`, {
   clientId: 'dashboard_' + Math.random().toString(16).slice(2, 8),
@@ -227,6 +300,11 @@ function updateUI(d) {
     const ok = gpsValid === 1 || gpsValid === true;
     el.textContent = ok ? 'Yes' : 'No';
     el.style.color = ok ? 'var(--good)' : 'var(--bad)';
+  }
+  /* 更新地图 */
+  if (d.lat !== undefined && d.lon !== undefined) {
+    const valid = (d.gps_v !== undefined ? d.gps_v : d.gps_valid);
+    updateMap(d.lat, d.lon, valid === 1 || valid === true);
   }
   if (d.csq !== undefined) {
     const csq = d.csq;
