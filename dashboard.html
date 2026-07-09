@@ -107,6 +107,10 @@ body {
   background: var(--card) !important; color: var(--dim) !important; font-size: 0.6rem !important;
 }
 .leaflet-control-attribution a { color: var(--accent) !important; }
+/* footer */
+.site-footer { text-align:center; padding:12px 16px 24px; font-size:0.72rem; color:var(--dim); }
+.site-footer a { color:var(--dim); text-decoration:none; }
+.site-footer a:hover { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -402,5 +406,8 @@ function addLog(type, msg) {
   if (logEl.children.length > 20) logEl.removeChild(logEl.lastChild);
 }
 </script>
+<footer class="site-footer">
+  CargoTracker-STM32H7 · <a href="index.html">接线指南</a> · <a href="dashboard.html">云端控制台</a> · <a href="report.html">设计报告</a> · <a href="https://github.com/MashedPotato817/CargoTracker-STM32H7">GitHub</a>
+</footer>
 </body>
 </html>

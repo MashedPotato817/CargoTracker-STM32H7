@@ -69,6 +69,10 @@ a { color: var(--accent); }
   .top-nav .links { display:flex; gap:14px; }
   .top-nav .links a { color:var(--dim); text-decoration:none; font-size:0.82rem; }
   .top-nav .links a.active { color:var(--accent); font-weight:600; }
+  /* footer */
+  .site-footer { text-align:center; padding:16px 0; margin-top:20px; border-top:1px solid var(--border); font-size:0.72rem; color:var(--dim); }
+  .site-footer a { color:var(--dim); text-decoration:none; }
+  .site-footer a:hover { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -377,12 +381,9 @@ publish {"temp":24.5,"hum":49.3,"lat":31.230400,"lon":121.473700,"gps_valid":1}<
   <li>中科微电子. ATGM336H GPS/北斗定位模块数据手册[Z]. 2023.</li>
 </ol>
 
-<p style="text-align:center;color:var(--dim);font-size:0.78rem;margin-top:40px;padding-bottom:32px;">
-  CargoTracker-STM32H7 ·
-  <a href="dashboard.html">云端控制台</a> ·
-  <a href="index.html">接线指南</a> ·
-  <a href="https://github.com/MashedPotato817/CargoTracker-STM32H7">GitHub</a>
-</p>
+<footer class="site-footer">
+  CargoTracker-STM32H7 · <a href="index.html">接线指南</a> · <a href="dashboard.html">云端控制台</a> · <a href="report.html">设计报告</a> · <a href="https://github.com/MashedPotato817/CargoTracker-STM32H7">GitHub</a>
+</footer>
 
 </body>
 </html>
