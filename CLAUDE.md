@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🧠 编码规范（自动触发）
+
+**修改任何 `.c`/`.h`/`.js`/`.html` 文件前，必须先调用 `andrej-karpathy-skills:karpathy-guidelines`。**
+
+触发条件（满足任一即调用）：
+- 新增或修改任何 C 代码（`test1/Core/`）
+- 新增或修改任何前端代码（`*.html`）
+- 重构或优化已有代码
+- 审查代码或修复 bug
+
+> 这个 skill 会自动规范编码行为：避免过度设计、最小化改动、先验证再提交。
+
 ## 项目概述
 
 STM32H7A3ZI-Q 智能货物追踪物联网系统。GPS + NFC + SHT31 温湿度 + Air780E(4G/MQTT) + W25Q128 Flash + 低功耗。
