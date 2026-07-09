@@ -308,22 +308,27 @@ client.on('message', (topic, payload) => {
 });
 
 function updateUI(d) {
+  const temp = Number(d.temp);
+  const hum = Number(d.hum);
+  const lat = Number(d.lat);
+  const lon = Number(d.lon);
+
   if (d.temp !== undefined) {
-    document.getElementById('temp-val').textContent = d.temp.toFixed(1);
+    document.getElementById('temp-val').textContent = Number.isFinite(temp) ? temp.toFixed(1) : '--';
   }
   if (d.hum !== undefined) {
-    document.getElementById('hum-val').textContent = d.hum.toFixed(1);
+    document.getElementById('hum-val').textContent = Number.isFinite(hum) ? hum.toFixed(1) : '--';
   }
   if (d.lat !== undefined) {
-    document.getElementById('lat-val').textContent = d.lat.toFixed(4);
+    document.getElementById('lat-val').textContent = Number.isFinite(lat) ? lat.toFixed(4) : '--';
   }
   if (d.lon !== undefined) {
-    document.getElementById('lon-val').textContent = d.lon.toFixed(4);
+    document.getElementById('lon-val').textContent = Number.isFinite(lon) ? lon.toFixed(4) : '--';
   }
   const gpsValid = d.gps_v !== undefined ? d.gps_v : d.gps_valid;
   if (gpsValid !== undefined) {
     const el = document.getElementById('gps-v');
-    const ok = gpsValid === 1 || gpsValid === true;
+    const ok = gpsValid === true || Number(gpsValid) === 1;
     el.textContent = ok ? 'Yes' : 'No';
     el.style.color = ok ? 'var(--good)' : 'var(--bad)';
   }
@@ -331,7 +336,7 @@ function updateUI(d) {
   if (d.lat !== undefined && d.lon !== undefined) {
     const valid = (d.gps_v !== undefined ? d.gps_v : d.gps_valid);
     const hasValidityFlag = valid !== undefined && valid !== null;
-    updateMap(Number(d.lat), Number(d.lon), hasValidityFlag ? (valid === 1 || valid === true) : true);
+    updateMap(lat, lon, hasValidityFlag ? (valid === true || Number(valid) === 1) : true);
   }
   if (d.csq !== undefined) {
     const csq = d.csq;
