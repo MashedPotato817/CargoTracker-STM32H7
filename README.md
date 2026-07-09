@@ -42,19 +42,29 @@ CargoTracker-STM32H7/
 ├── doc/                           # 设计文档
 │   ├── STM32H7A3ZI-Q_程序下载要点.md # Keil 烧录
 │   ├── STM32H7_CubeMX_Config.md   # CubeMX 配置
-│   └── STM32H7_Logistics_System.md # 系统方案
+│   ├── STM32H7_Logistics_System.md # 系统方案
+│   └── code-review-20260709.md    # 代码全面审查报告（29 问题）
 ├── doc-workflow/                  # 开发工作流
-│   ├── task2.md                   #   硬件集成（当前）
+│   ├── README.md                  #   目录使用指南
+│   ├── last-tasks.md              #   🎯 当前未完成任务清单
+│   ├── task2.md                   #   硬件集成
 │   ├── task3.md                   #   云平台对接
 │   ├── task3.1.md                 #     EMQX Cloud 注册
+│   ├── task3.3.md                 #     云指令下发
+│   ├── task3.5.md                 #     地图实时定位
 │   ├── task4.md                   #   低功耗优化
 │   ├── task5.md                   #   整机测试 + 产出物
 │   ├── GIT_WORKFLOW.md            #   Git 协作规范
-│   ├── TROUBLESHOOTING.md         #   踩坑记录（13 条）
+│   ├── TROUBLESHOOTING.md         #   踩坑记录
 │   ├── hardware_map.md            #   硬件-代码映射表
-│   └── archive/                   #   历史日志
-├── report-workflow/               # 论文/报告
-│   └── design_report.md           #   设计文档（8 章）
+│   └── archive/                   #   历史日志（logs/plans/debug）
+├── report-workflow/               # 竞赛产出物
+│   ├── design_report.md           #   设计文档
+│   ├── competition_report.md      #   竞赛报告正文
+│   ├── gpt-prompts.md             #   GPT 绘图+润色 prompts
+│   ├── video-guide.md             #   演示视频拍摄剪辑指南
+│   ├── demand.md                  #   竞赛提交要求
+│   └── template.md                #   官方报告模板
 ├── user-manual-md/                # 参考手册
 └── test1/                         # Keil MDK 工程
     └── Core/                      # 源码（Drivers/Middlewares 不入库）
@@ -118,11 +128,20 @@ while (1)
 
 ## 当前开发阶段
 
-**硬件集成阶段**。所有外设模块（SHT31、PN532、ATGM336H、Air780E、W25Q128）已到齐。驱动采用条件编译双模式（`*_USE_HAL_*` 宏），可独立切换 stub/真实模式。
+**竞赛交付阶段**（截止 2026-07-09 18:00）。硬件集成基本完成，前端控制台已上线，正在最后联调。
 
-详见 [`doc-workflow/task2.md`](doc-workflow/task2.md) — 硬件集成任务计划。
+| 模块 | 状态 | 说明 |
+|------|:---:|------|
+| SHT31 温湿度 | ✅ | 24-25°C / 47-51% |
+| Air780E 4G/MQTT | ✅ | CSQ=27~28, telemetry 上报正常 |
+| W25Q128 Flash | ⚠️ | JEDEC OK, 读写待验 |
+| GPS 定位 | ⚠️ | 待户外测试 |
+| PN532 NFC | ⚠️ | init OK, 待标签测试 |
+| 云端控制台 | ✅ | dashboard.html 上线（地图+仪表盘+指令） |
 
-> ⚠️ 遇到问题先查 [`doc-workflow/TROUBLESHOOTING.md`](doc-workflow/TROUBLESHOOTING.md)（团队踩坑记录），解决后往里面补充。
+> 🎯 当前入口：[`doc-workflow/last-tasks.md`](doc-workflow/last-tasks.md) — 未完成任务清单
+> ⚠️ 遇到问题先查 [`doc-workflow/TROUBLESHOOTING.md`](doc-workflow/TROUBLESHOOTING.md)
+> 📋 代码审查：[`doc/code-review-20260709.md`](doc/code-review-20260709.md) — 29 个问题，P0-P3 优先级
 
 ### FreeRTOS 任务架构（6 Task + 3 Queue）
 
