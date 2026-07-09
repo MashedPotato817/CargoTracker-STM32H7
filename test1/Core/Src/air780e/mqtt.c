@@ -20,6 +20,7 @@
 #define MQTT_RX_BUFFER_SIZE  512U
 #define MQTT_RX_POLL_MS      20U
 #define MQTT_CIPRXGET_INTERVAL_MS 5000U
+#define MQTT_SEND_CONFIRM_MS 1000U
 #define MQTT_ENV_SCALE       10L
 #define MQTT_COORD_SCALE     1000000L
 
@@ -209,7 +210,9 @@ static uint8_t TCP_SendBinary(uint8_t *data, uint32_t len)
 {
 #if AIR780E_USE_HAL_UART
     char cmd[32];
+    char response[96];
     uint8_t ch;
+    uint32_t pos = 0U;
     uint32_t start_tick;
 
     /* CIPSEND */
@@ -222,21 +225,34 @@ static uint8_t TCP_SendBinary(uint8_t *data, uint32_t len)
     /* 发送原始二进制 */
     HAL_Delay(50);
     if (HAL_UART_Transmit(&huart1, data, (uint16_t)len, 5000U) != HAL_OK) {
+        printf("[MQTT] binary transmit failed\n");
         return 0U;
     }
 
     /* 等 SEND OK */
+    response[0] = '\0';
     start_tick = HAL_GetTick();
-    while ((HAL_GetTick() - start_tick) < 5000U) {
+    while ((HAL_GetTick() - start_tick) < MQTT_SEND_CONFIRM_MS) {
         if (HAL_UART_Receive(&huart1, &ch, 1U, 20U) == HAL_OK) {
-            /* just drain */
-        }
-        /* 注意：模块返回 "SEND OK" 但我们不解析它 */
-        if ((HAL_GetTick() - start_tick) > 200U) {
-            break;  /* 给 200ms 收确认 */
+            if (pos < (sizeof(response) - 1U)) {
+                response[pos] = (char)ch;
+                pos++;
+                response[pos] = '\0';
+            }
+            if (strstr(response, "SEND OK") != NULL) {
+                printf("[MQTT] SEND OK\n");
+                return 1U;
+            }
+            if ((strstr(response, "ERROR") != NULL) ||
+                (strstr(response, "FAIL") != NULL) ||
+                (strstr(response, "CLOSED") != NULL)) {
+                printf("[MQTT] SEND failed: %s\n", response);
+                return 0U;
+            }
         }
     }
 
+    printf("[MQTT] SEND OK wait timeout, assume sent\n");
     return 1U;
 #else
     (void)data;
