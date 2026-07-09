@@ -95,8 +95,7 @@ void App_TaskStateMachine(void)
     uint16_t cloud_value = APP_CLOUD_CMD_NONE;
     uint32_t idle_log_tick = 0U;
 
-    printf("[SM] task started, waiting 5s for Air780E...\n");
-    osDelay(5000);
+    printf("[SM] task started (Air780E OFF, waiting NFC)\n");
     StateMachine_Init();
     printf("[SM] state_machine done\n");
     Alarm_Init();
@@ -104,76 +103,132 @@ void App_TaskStateMachine(void)
     Power_Init();
     printf("[SM] power done\n");
 
-    printf("[StateMachine] === AUTO-START full flow ===\n");
-
-    /* 启动后自动触发一次（PC13 按键硬件故障临时绕过） */
-    {
-        uint16_t auto_event = APP_ACTIVATION_NFC;
-        (void)osMessageQueuePut(queue_activationHandle, &auto_event, 0, 0);
-    }
+    printf("[StateMachine] waiting first NFC activation...\n");
 
     for (;;) {
+        /* === 等待 NFC 刷卡激活 === */
         if (osMessageQueueGet(queue_activationHandle, &activation_event, NULL, 1000) != osOK) {
             uint32_t now_tick = osKernelGetTickCount();
-
             if ((now_tick - idle_log_tick) >= 5000U) {
                 idle_log_tick = now_tick;
-                printf("[StateMachine] waiting activation\n");
+                printf("[StateMachine] waiting NFC...\n");
             }
             continue;
         }
 
         reset_queue(queue_activationHandle);
-        reset_queue(queue_sensor_dataHandle);
-
-        TelemetryData telemetry = {0};
-        AppSensorPacket packet = {0};
-
-        printf("[StateMachine] activation event=%u\n", activation_event);
+        printf("[StateMachine] NFC activated, Air780E ON\n");
         StateMachine_Set(STATE_NFC_ACTIVE);
 
-        StateMachine_Set(STATE_GPS_LOCATE);
-        request_gps_sample();
-        if (wait_for_sensor_packet(APP_SENSOR_PACKET_GPS, &packet, 7000) != 0U) {
-            telemetry.gps = packet.data.gps;
-        } else {
-            printf("[StateMachine] GPS timeout\n");
+        Power_Air780E_PowerOn();  /* 开机脉冲 + 等 5s 启动 */
+        /* Air780E_Init() 和 MQTT_Init() 内部不再调 PowerOn */
+        Air780E_Init();
+        MQTT_Init();
+        Alarm_SetSystemActive(1);
+
+        /* === Air780E 在线，定时上报（10s/次），NFC 刷卡关机 === */
+        for (;;) {
+            TelemetryData telemetry = {0};
+            AppSensorPacket packet = {0};
+
+            /* ---- GPS ---- */
+            StateMachine_Set(STATE_GPS_LOCATE);
+            reset_queue(queue_sensor_dataHandle);
+            request_gps_sample();
+            {
+                uint32_t t0 = osKernelGetTickCount();
+                uint8_t gps_done = 0;
+                while ((osKernelGetTickCount() - t0) < 7000U) {
+                    uint32_t packet_addr = 0;
+                    if (osMessageQueueGet(queue_sensor_dataHandle,
+                                          &packet_addr, NULL, 500) == osOK) {
+                        AppSensorPacket *p = (AppSensorPacket *)packet_addr;
+                        if ((p != NULL) && (p->type == APP_SENSOR_PACKET_GPS)) {
+                            telemetry.gps = p->data.gps;
+                            gps_done = 1;
+                            break;
+                        }
+                    }
+                    /* 随时响应 NFC 关机 */
+                    if (osMessageQueueGet(queue_activationHandle,
+                                          &activation_event, NULL, 0) == osOK) {
+                        printf("[StateMachine] NFC shutdown during GPS\n");
+                        goto nfc_shutdown;
+                    }
+                }
+                if (!gps_done) printf("[StateMachine] GPS timeout\n");
+            }
+
+            /* ---- SHT31 ---- */
+            StateMachine_Set(STATE_ENV_SAMPLE);
+            request_env_sample();
+            {
+                uint32_t t0 = osKernelGetTickCount();
+                uint8_t env_done = 0;
+                while ((osKernelGetTickCount() - t0) < 5000U) {
+                    uint32_t packet_addr = 0;
+                    if (osMessageQueueGet(queue_sensor_dataHandle,
+                                          &packet_addr, NULL, 500) == osOK) {
+                        AppSensorPacket *p = (AppSensorPacket *)packet_addr;
+                        if ((p != NULL) && (p->type == APP_SENSOR_PACKET_ENV)) {
+                            telemetry.env = p->data.env;
+                            env_done = 1;
+                            break;
+                        }
+                    }
+                    if (osMessageQueueGet(queue_activationHandle,
+                                          &activation_event, NULL, 0) == osOK) {
+                        printf("[StateMachine] NFC shutdown during SHT31\n");
+                        goto nfc_shutdown;
+                    }
+                }
+                if (!env_done) printf("[StateMachine] SHT31 timeout\n");
+            }
+
+            /* ---- 报警（防抖计数） ---- */
+            if (Alarm_FeedSample(&telemetry.env)) {
+                StateMachine_Set(STATE_ALARM);
+                Alarm_SetActive(1);
+            } else {
+                Alarm_SetActive(0);
+            }
+
+            /* ---- MQTT 上传 ---- */
+            StateMachine_Set(STATE_UPLOAD);
+            HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
+            if (MQTT_PublishTelemetry(&telemetry) == 0U) {
+                (void)W25Q128_WriteTelemetry(&telemetry);
+            }
+            HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_RESET);
+
+            /* ---- 云指令（2s 超时） ---- */
+            reset_queue(queue_cloud_cmdHandle);
+            {
+                uint16_t cmd = APP_CLOUD_CMD_NONE;
+                if (osMessageQueueGet(queue_cloud_cmdHandle, &cmd, NULL, 2000) == osOK) {
+                    handle_cloud_command((AppCloudCommand)cmd);
+                }
+            }
+
+            /* 等 10 秒，期间检查 NFC 关机 */
+            printf("[StateMachine] next report in 10s (NFC to power off)\n");
+            {
+                uint32_t t0 = osKernelGetTickCount();
+                while ((osKernelGetTickCount() - t0) < 10000U) {
+                    if (osMessageQueueGet(queue_activationHandle,
+                                          &activation_event, NULL, 500) == osOK) {
+                        printf("[StateMachine] NFC received, Air780E OFF\n");
+                        goto nfc_shutdown;
+                    }
+                }
+            }
         }
 
-        StateMachine_Set(STATE_ENV_SAMPLE);
-        request_env_sample();
-        if (wait_for_sensor_packet(APP_SENSOR_PACKET_ENV, &packet, 5000) != 0U) {
-            telemetry.env = packet.data.env;
-        } else {
-            printf("[StateMachine] SHT31 timeout\n");
-        }
-
-        if (Alarm_CheckEnv(&telemetry.env) != 0U) {
-            StateMachine_Set(STATE_ALARM);
-            Alarm_SetActive(1);
-        } else {
-            Alarm_SetActive(0);
-        }
-
-        StateMachine_Set(STATE_UPLOAD);
-        Power_Air780E_SetPwrKey(0);
-        HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_SET);
-        if (MQTT_PublishTelemetry(&telemetry) == 0U) {
-            (void)W25Q128_WriteTelemetry(&telemetry);
-        }
-        HAL_GPIO_WritePin(LD3_RED_GPIO_Port, LD3_RED_Pin, GPIO_PIN_RESET);
-
-        reset_queue(queue_cloud_cmdHandle);
-        StateMachine_Set(STATE_WAIT_CLOUD);
-        cloud_value = APP_CLOUD_CMD_NONE;
-        if (osMessageQueueGet(queue_cloud_cmdHandle, &cloud_value, NULL, APP_CLOUD_WAIT_MS) == osOK) {
-            handle_cloud_command((AppCloudCommand)cloud_value);
-        } else {
-            handle_cloud_command(APP_CLOUD_CMD_NONE);
-        }
-
-        StateMachine_Set(STATE_RETURN_SLEEP);
+nfc_shutdown:
+        reset_queue(queue_activationHandle);
+        Alarm_SetSystemActive(0);
         Power_Air780E_PowerOff();
+        StateMachine_Set(STATE_RETURN_SLEEP);
         Power_EnterStopStub();
         StateMachine_Set(STATE_SLEEP);
     }
@@ -238,8 +293,7 @@ void App_TaskGPS(void)
 
 void App_Task4GMQTT(void)
 {
-    Air780E_Init();
-    MQTT_Init();
+    printf("[4G Task] idle (waiting NFC to power on Air780E)\n");
 
     for (;;) {
         AppCloudCommand command = MQTT_PollCommand();

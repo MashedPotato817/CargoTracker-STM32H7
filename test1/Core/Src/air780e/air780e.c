@@ -143,8 +143,6 @@ void Air780E_Init(void)
 #else
     printf("[Air780E] init start (stub AT, set AIR780E_USE_HAL_UART=1 after CubeMX enables USART1)\n");
 #endif
-    Power_Air780E_PowerOn();
-
     at_ok = Air780E_SendAT("AT", "OK", 3000U);
     echo_ok = Air780E_SendAT("ATE0", "OK", 1000U);
     (void)Air780E_SendAT("AT+CSQ", "OK", 1000U);

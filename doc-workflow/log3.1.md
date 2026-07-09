@@ -32,12 +32,19 @@ Air780E 必须通过 TLS 连接：`tls://h8111173.ala.cn-hangzhou.emqxsl.cn:8883
 
 mqtt.c 中 AT 指令需用 `tls://` 前缀而非 `tcp://`。
 
-## 下一步
+## 当前验证进度（2026-07-09）
 
 - [x] Broker 地址已获取
 - [x] 客户端认证已创建
-- [x] WebSocket 客户端验证（2026-07-09 00:04, MQTTX Web, testtopic/1. 收发成功）
-- [ ] 确认 Air780E AT 固件是否支持 MQTT over TLS
+- [x] WebSocket 客户端验证
+- [x] 公共 TCP broker 全链路打通：
+  - [x] Air780E 4G 联网 → TCP 连接 broker.emqx.io:1883
+  - [x] 手写 MQTT CONNECT + CONNACK 握手
+  - [x] MQTT PUBLISH 遥测 JSON 发布成功
+  - [x] MQTT SUBSCRIBE cargo/cmd 订阅成功
+  - [x] AT+CIPRXGET 接收真云指令（HOLD/RETURN/CONTINUE）
+  - [x] dashboard.html 点按钮 → 设备收到指令
+- [ ] TLS broker 切换（待 Air780E 固件确认）
 
 ## 开发期间：使用公共 TCP Broker
 

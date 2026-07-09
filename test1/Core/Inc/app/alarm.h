@@ -8,8 +8,9 @@
 #define ALARM_HUMID_HIGH_PCT   75.0f
 
 void Alarm_Init(void);
-uint8_t Alarm_CheckEnv(const EnvSample *env);
+uint8_t Alarm_FeedSample(const EnvSample *env);
 void Alarm_SetActive(uint8_t active);
+void Alarm_SetSystemActive(uint8_t active);
 void Alarm_Task(void);
 
 #endif
