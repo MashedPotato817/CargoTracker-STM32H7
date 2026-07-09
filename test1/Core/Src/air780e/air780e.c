@@ -99,6 +99,11 @@ static uint8_t Air780E_ParseSignalQuality(const char *response)
     return 1U;
 }
 
+uint8_t Air780E_GetSignalQuality(void)
+{
+    return signal_quality;
+}
+
 static uint8_t Air780E_IsRegistered(const char *response, const char *prefix)
 {
     const char *line = strstr(response, prefix);

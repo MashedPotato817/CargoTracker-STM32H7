@@ -346,12 +346,13 @@ static void MQTT_BuildTelemetryPayload(const TelemetryData *telemetry, char *pay
 
     (void)snprintf(payload,
                    payload_size,
-                   "{\"temp\":%s,\"hum\":%s,\"lat\":%s,\"lon\":%s,\"gps_valid\":%u}",
+                   "{\"temp\":%s,\"hum\":%s,\"lat\":%s,\"lon\":%s,\"gps_valid\":%u,\"csq\":%u}",
                    temp_text,
                    hum_text,
                    lat_text,
                    lon_text,
-                   telemetry->gps.valid);
+                   telemetry->gps.valid,
+                   Air780E_GetSignalQuality());
 }
 
 static uint8_t MQTT_BufferContains(const uint8_t *buf, uint32_t len, const char *needle)
