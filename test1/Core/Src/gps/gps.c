@@ -13,7 +13,7 @@
 #define GPS_UART_LINE_TIMEOUT_MS 1200U
 #define GPS_UART_BAUDRATE 9600U
 
-static GpsLocation last_location = {31.2304f, 121.4737f, 1U};
+static GpsLocation last_location = {0.0f, 0.0f, 0U};  /* valid=0 直到真定位 */
 
 static const char *const stub_nmea_sentences[] = {
     "$GNRMC,092204.999,A,3113.8240,N,12128.4220,E,0.00,0.00,070726,,,A*68",
@@ -166,9 +166,17 @@ GpsLocation GPS_GetLocation(void)
 {
     char line[GPS_NMEA_LINE_MAX];
     GpsLocation location = last_location;
+    int tries;
 
-    if ((GPS_ReadLine(line, sizeof(line)) != 0U) && (GPS_ParseNmea(line, &location) != 0U)) {
-        last_location = location;
+    /* 循环读，直到找到有效的 RMC/GGA 句 */
+    for (tries = 0; tries < 10; tries++) {
+        if (GPS_ReadLine(line, sizeof(line)) == 0U) {
+            break;  /* 超时无数据 */
+        }
+        if (GPS_ParseNmea(line, &location) != 0U) {
+            last_location = location;
+            break;
+        }
     }
 
     return location;
