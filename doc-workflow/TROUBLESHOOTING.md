@@ -257,3 +257,55 @@ rg -n "RVDS|ARM_CM4F|port.c" test1/MDK-ARM
 `Core/Src/gpio.c`：所有 `LD1_GREEN_Pin` → `AIR780E_PWRKEY_Pin`
 
 > 如果不需要 Generate Code，这三步**不用做**。
+
+---
+
+### 14. GPS 上报位置大偏差：经纬度小数被截断
+
+**现象**：GPS 已经能输出经纬度，但 dashboard 地图位置明显偏离实际位置，可能达到几十公里；串口日志或 MQTT payload 里只看到 `lat=31 lon=121` 这类整数坐标。
+
+**原因**：GPS 解析得到的是十进制度数 float，例如 `31.230400, 121.473700`，但 MQTT 上报或调试日志如果用 `(int)` 转换，会丢掉小数部分。地图收到 `31,121` 后会定位到整数经纬度位置，偏差非常大。
+
+**解决**：
+
+1. MQTT payload 中 `lat/lon` 必须保留小数，至少 5~6 位，例如 `31.230400`。
+2. 在 Keil/MicroLIB 环境下不要直接依赖 `%f`，推荐把坐标按 `1000000` 放大为整数后手工拼出小数字符串。
+3. 串口 GPS sample 日志也应打印小数和 `valid`，避免误判 GPS 解析仍是 stub 整数。
+
+**验证**：MQTT 日志应从：
+
+```text
+{"temp":24,"hum":49,"lat":31,"lon":121,"gps_valid":1}
+```
+
+变为：
+
+```text
+{"temp":24,"hum":49,"lat":31.230400,"lon":121.473700,"gps_valid":1}
+```
+
+---
+
+### 15. 温湿度上报只有整数：float 被 MQTT payload 截断
+
+**现象**：SHT31 真实采样有小数，但 dashboard 只显示 `24.0C / 49.0%` 这类整数小数形式，MQTT 日志为 `{"temp":24,"hum":49,...}`。
+
+**原因**：`TelemetryData.env` 中温湿度是 float，但 MQTT payload 里如果用 `(int)` 转换，会把小数直接丢掉。dashboard 虽然调用 `toFixed(1)`，但收到的已经是整数，只能显示 `.0`。
+
+**解决**：
+
+1. MQTT payload 中 `temp/hum` 保留 1 位小数，例如 `24.5` / `49.3`。
+2. 在 Keil/MicroLIB 环境下不要直接依赖 `%f`，推荐把数值按 `10` 放大为整数后手工拼出 1 位小数字符串。
+3. SHT31 串口 sample 日志也同步打印 1 位小数，方便现场确认真实采样精度。
+
+**验证**：MQTT 日志应从：
+
+```text
+{"temp":24,"hum":49,"lat":31.230400,"lon":121.473700,"gps_valid":1}
+```
+
+变为：
+
+```text
+{"temp":24.5,"hum":49.3,"lat":31.230400,"lon":121.473700,"gps_valid":1}
+```

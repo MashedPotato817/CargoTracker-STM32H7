@@ -20,6 +20,8 @@
 #define MQTT_RX_BUFFER_SIZE  512U
 #define MQTT_RX_POLL_MS      20U
 #define MQTT_CIPRXGET_INTERVAL_MS 5000U
+#define MQTT_ENV_SCALE       10L
+#define MQTT_COORD_SCALE     1000000L
 
 static uint8_t mqtt_ready = 0U;
 
@@ -245,15 +247,94 @@ static uint8_t TCP_SendBinary(uint8_t *data, uint32_t len)
 
 /* ---------- MQTT API ---------- */
 
+static int32_t MQTT_ScaleFixed1(float value)
+{
+    float scaled = value * (float)MQTT_ENV_SCALE;
+
+    return (value >= 0.0f) ? (int32_t)(scaled + 0.5f) : (int32_t)(scaled - 0.5f);
+}
+
+static int32_t MQTT_ScaleCoordinate(float coordinate)
+{
+    float scaled = coordinate * (float)MQTT_COORD_SCALE;
+
+    return (coordinate >= 0.0f) ? (int32_t)(scaled + 0.5f) : (int32_t)(scaled - 0.5f);
+}
+
+static void MQTT_FormatFixed1(float value, char *buffer, uint32_t buffer_size)
+{
+    int32_t scaled = MQTT_ScaleFixed1(value);
+    uint32_t abs_scaled;
+    const char *sign = "";
+
+    if ((buffer == NULL) || (buffer_size == 0U)) {
+        return;
+    }
+
+    if (scaled < 0) {
+        sign = "-";
+        abs_scaled = (uint32_t)(-scaled);
+    } else {
+        abs_scaled = (uint32_t)scaled;
+    }
+
+    (void)snprintf(buffer,
+                   buffer_size,
+                   "%s%lu.%lu",
+                   sign,
+                   (unsigned long)(abs_scaled / (uint32_t)MQTT_ENV_SCALE),
+                   (unsigned long)(abs_scaled % (uint32_t)MQTT_ENV_SCALE));
+}
+
+static void MQTT_FormatCoordinate(float coordinate, char *buffer, uint32_t buffer_size)
+{
+    int32_t scaled = MQTT_ScaleCoordinate(coordinate);
+    uint32_t abs_scaled;
+    uint32_t integer_part;
+    uint32_t fraction_part;
+    const char *sign = "";
+
+    if ((buffer == NULL) || (buffer_size == 0U)) {
+        return;
+    }
+
+    if (scaled < 0) {
+        sign = "-";
+        abs_scaled = (uint32_t)(-scaled);
+    } else {
+        abs_scaled = (uint32_t)scaled;
+    }
+
+    integer_part = abs_scaled / (uint32_t)MQTT_COORD_SCALE;
+    fraction_part = abs_scaled % (uint32_t)MQTT_COORD_SCALE;
+
+    (void)snprintf(buffer,
+                   buffer_size,
+                   "%s%lu.%06lu",
+                   sign,
+                   (unsigned long)integer_part,
+                   (unsigned long)fraction_part);
+}
+
 static void MQTT_BuildTelemetryPayload(const TelemetryData *telemetry, char *payload, uint32_t payload_size)
 {
+    char temp_text[12];
+    char hum_text[12];
+    char lat_text[16];
+    char lon_text[16];
+
+    MQTT_FormatFixed1(telemetry->env.temperature_c, temp_text, sizeof(temp_text));
+    MQTT_FormatFixed1(telemetry->env.humidity_percent, hum_text, sizeof(hum_text));
+    MQTT_FormatCoordinate(telemetry->gps.latitude, lat_text, sizeof(lat_text));
+    MQTT_FormatCoordinate(telemetry->gps.longitude, lon_text, sizeof(lon_text));
+
     (void)snprintf(payload,
                    payload_size,
-                   "{\"temp\":%d,\"hum\":%d,\"lat\":%d,\"lon\":%d,\"gps_valid\":%u}",
-                   (int)telemetry->env.temperature_c,
-                   (int)telemetry->env.humidity_percent,
-                   (int)telemetry->gps.latitude,
-                   (int)telemetry->gps.longitude,
+                   "{\"temp\":%s,\"hum\":%s,\"lat\":%s,\"lon\":%s,\"gps_valid\":%u}",
+                   temp_text,
+                   hum_text,
+                   lat_text,
+                   lon_text,
                    telemetry->gps.valid);
 }
 

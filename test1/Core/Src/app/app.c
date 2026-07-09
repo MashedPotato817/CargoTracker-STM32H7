@@ -20,6 +20,8 @@ extern osMessageQueueId_t queue_cloud_cmdHandle;
 
 #define APP_CLOUD_WAIT_MS 30000U
 #define APP_MQTT_POLL_MS 1000U
+#define APP_ENV_SCALE 10L
+#define APP_COORD_SCALE 1000000L
 
 static volatile uint8_t gps_sample_requested = 0;
 static volatile uint8_t env_sample_requested = 0;
@@ -80,6 +82,20 @@ static void request_env_sample(void)
 {
     reset_queue(queue_sensor_dataHandle);
     env_sample_requested = 1;
+}
+
+static int32_t scale_fixed1(float value)
+{
+    float scaled = value * (float)APP_ENV_SCALE;
+
+    return (value >= 0.0f) ? (int32_t)(scaled + 0.5f) : (int32_t)(scaled - 0.5f);
+}
+
+static int32_t scale_coordinate(float coordinate)
+{
+    float scaled = coordinate * (float)APP_COORD_SCALE;
+
+    return (coordinate >= 0.0f) ? (int32_t)(scaled + 0.5f) : (int32_t)(scaled - 0.5f);
 }
 
 void App_SendActivationFromISR(uint16_t event)
@@ -259,9 +275,22 @@ void App_TaskI2CSensors(void)
 
             uint32_t packet_addr = (uint32_t)&env_packet;
             (void)osMessageQueuePut(queue_sensor_dataHandle, &packet_addr, 0, 0);
-            printf("[I2C] SHT31 sample T=%dC H=%d%%\n",
-                   (int)env_packet.data.env.temperature_c,
-                   (int)env_packet.data.env.humidity_percent);
+            {
+                int32_t temp_scaled = scale_fixed1(env_packet.data.env.temperature_c);
+                int32_t hum_scaled = scale_fixed1(env_packet.data.env.humidity_percent);
+                const char *temp_sign = (temp_scaled < 0) ? "-" : "";
+                const char *hum_sign = (hum_scaled < 0) ? "-" : "";
+                uint32_t temp_abs = (temp_scaled < 0) ? (uint32_t)(-temp_scaled) : (uint32_t)temp_scaled;
+                uint32_t hum_abs = (hum_scaled < 0) ? (uint32_t)(-hum_scaled) : (uint32_t)hum_scaled;
+
+                printf("[I2C] SHT31 sample T=%s%lu.%luC H=%s%lu.%lu%%\n",
+                       temp_sign,
+                       (unsigned long)(temp_abs / (uint32_t)APP_ENV_SCALE),
+                       (unsigned long)(temp_abs % (uint32_t)APP_ENV_SCALE),
+                       hum_sign,
+                       (unsigned long)(hum_abs / (uint32_t)APP_ENV_SCALE),
+                       (unsigned long)(hum_abs % (uint32_t)APP_ENV_SCALE));
+            }
         }
 
         osDelay(500);
@@ -282,9 +311,23 @@ void App_TaskGPS(void)
 
             uint32_t packet_addr = (uint32_t)&gps_packet;
             (void)osMessageQueuePut(queue_sensor_dataHandle, &packet_addr, 0, 0);
-            printf("[GPS] sample lat=%d lon=%d\n",
-                   (int)gps_packet.data.gps.latitude,
-                   (int)gps_packet.data.gps.longitude);
+            {
+                int32_t lat_scaled = scale_coordinate(gps_packet.data.gps.latitude);
+                int32_t lon_scaled = scale_coordinate(gps_packet.data.gps.longitude);
+                const char *lat_sign = (lat_scaled < 0) ? "-" : "";
+                const char *lon_sign = (lon_scaled < 0) ? "-" : "";
+                uint32_t lat_abs = (lat_scaled < 0) ? (uint32_t)(-lat_scaled) : (uint32_t)lat_scaled;
+                uint32_t lon_abs = (lon_scaled < 0) ? (uint32_t)(-lon_scaled) : (uint32_t)lon_scaled;
+
+                printf("[GPS] sample lat=%s%lu.%06lu lon=%s%lu.%06lu valid=%u\n",
+                       lat_sign,
+                       (unsigned long)(lat_abs / (uint32_t)APP_COORD_SCALE),
+                       (unsigned long)(lat_abs % (uint32_t)APP_COORD_SCALE),
+                       lon_sign,
+                       (unsigned long)(lon_abs / (uint32_t)APP_COORD_SCALE),
+                       (unsigned long)(lon_abs % (uint32_t)APP_COORD_SCALE),
+                       gps_packet.data.gps.valid);
+            }
         }
 
         osDelay(500);

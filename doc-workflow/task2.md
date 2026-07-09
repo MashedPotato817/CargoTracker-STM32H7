@@ -51,7 +51,7 @@ git commit -m "pre-cube: 外设使能前快照"
 
 - [x] `SHT31_USE_HAL_I2C = 1`（已配置）
 - [x] 连接 SHT31 到 I2C1 总线（PB8 SCL, PB9 SDA）
-- [x] 编译 → 烧录 → 串口：`T=24~25C H=47~51%`（真实数据，非 stub）
+- [x] 编译 → 烧录 → 串口：`T=24.0~25.9C H=47.0~51.9%`（真实数据，非 stub）
 - [x] 连续多次采样数据正常波动
 
 ### 2.2.2 PN532 NFC ⚠️
@@ -69,7 +69,7 @@ git commit -m "pre-cube: 外设使能前快照"
 
 ## Task 2.3: USART2 驱动验证（GPS）⚠️ stub 数据
 
-**负责人：B** | 代码：✅ | 硬件：⚠️ 串口输出 lat=31 lon=121（stub 固定值）
+**负责人：B** | 代码：✅ | 硬件：⚠️ 串口输出 lat=31.230400 lon=121.473700（stub 固定值）
 
 - [x] `GPS_USE_HAL_UART = 1`（已配置）
 - [x] USART2 HAL 真 UART 逐字节 NMEA 读取（已实现）
@@ -102,7 +102,7 @@ git commit -m "pre-cube: 外设使能前快照"
 - [x] AT 指令序列：AT ✅ ATE0 ✅ CSQ=27~28 ✅ CREG=0,1 ✅ CGREG=0,1 ✅ CEREG=0,1 ✅ CGATT=1 ✅
 - [x] TCP 连接 broker.emqx.io:1883 ✅
 - [x] MQTT CONNECT → CONNACK ✅
-- [x] MQTT PUBLISH 成功 → dashboard 收到 `{"temp":24,"hum":49,...}`
+- [x] MQTT PUBLISH 成功 → dashboard 收到 `{"temp":24.5,"hum":49.3,"lat":31.230400,"lon":121.473700,...}`
 - [x] 云端指令订阅 → 串口打印 `cloud payload: {"cmd":"HOLD"}` 等
 
 > Air780E 全链路已打通。注意：多次启动后串口日志出现混叠（reset + 日志乱序），需排查复位原因。
