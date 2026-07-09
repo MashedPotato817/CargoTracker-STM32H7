@@ -11,6 +11,7 @@
 :root {
   --bg: #0a0d14; --card: #131620; --border: #1e2230;
   --text: #9aa0b4; --head: #e0e4f0; --accent: #4da6ff;
+  --dim: #66708a;
   --good: #34d399; --warn: #f59e0b; --bad: #ef4444;
   --gauge-bg: #1a1e2a;
 }
@@ -78,17 +79,22 @@ body {
 .bar-inner { height: 100%; border-radius: 4px; background: var(--good); transition: width 0.3s; }
 /* map */
 #map-container {
-  height: 240px; border-radius: 8px; overflow: hidden;
+  width: 100%; height: 260px; border-radius: 8px; overflow: hidden;
   background: var(--gauge-bg);
+  border: 1px solid rgba(154, 160, 180, 0.18);
 }
 .map-info {
-  display: flex; gap: 16px; margin-bottom: 8px; font-size: 0.78rem;
+  display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; font-size: 0.78rem;
 }
 .map-info .item { display: flex; gap: 4px; }
 .map-info .label { color: var(--dim); }
 .map-info .val { color: var(--head); font-family: monospace; }
 /* Leaflet 暗色覆盖 */
 .leaflet-container { background: var(--gauge-bg); }
+.leaflet-container img { max-width: none !important; max-height: none !important; }
+.leaflet-tile {
+  filter: brightness(0.55) contrast(1.15) saturate(0.55) invert(1) hue-rotate(180deg);
+}
 .leaflet-control-zoom a {
   background: var(--card); color: var(--head); border-color: var(--border);
 }
@@ -195,27 +201,45 @@ const EAST_CHINA_BOUNDS = [[27.0, 116.0], [35.5, 123.0]];
 const map = L.map('map-container', {
   attributionControl: false,
   zoomControl: true,
+  preferCanvas: true,
   fadeAnimation: false,       // 关闭瓦片淡入，消除色块闪烁
   maxBounds: EAST_CHINA_BOUNDS,
   maxBoundsViscosity: 0.8,    // 拖出边界时有阻力但不硬卡
   minZoom: 7,
 }).setView([31.2, 120.5], 9); // 默认视野：长三角居中
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
-  noWrap: true,               // 不加载范围外瓦片
   updateWhenIdle: false,      // 拖动/缩放时立即加载，不等空闲
+  keepBuffer: 3,
+  crossOrigin: true,
 }).addTo(map);
 
 let deviceMarker = null;
 let firstFix = true;
 
+function refreshMapSize() {
+  requestAnimationFrame(() => {
+    map.invalidateSize({ pan: false });
+    setTimeout(() => map.invalidateSize({ pan: false }), 200);
+  });
+}
+
+window.addEventListener('load', refreshMapSize);
+window.addEventListener('resize', refreshMapSize);
+refreshMapSize();
+
 function updateMap(lat, lon, valid) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return;
+  }
+
   if (!valid) {
     if (deviceMarker) deviceMarker.setStyle({ fillColor: '#6b7280', color: '#6b7280' });
     return;
   }
 
+  refreshMapSize();
   const pos = [lat, lon];
 
   if (!deviceMarker) {
@@ -235,6 +259,8 @@ function updateMap(lat, lon, valid) {
   if (firstFix) {
     map.setView(pos, 15, { animate: true });
     firstFix = false;
+  } else {
+    map.panTo(pos, { animate: true, duration: 0.4 });
   }
 }
 
@@ -304,7 +330,8 @@ function updateUI(d) {
   /* 更新地图 */
   if (d.lat !== undefined && d.lon !== undefined) {
     const valid = (d.gps_v !== undefined ? d.gps_v : d.gps_valid);
-    updateMap(d.lat, d.lon, valid === 1 || valid === true);
+    const hasValidityFlag = valid !== undefined && valid !== null;
+    updateMap(Number(d.lat), Number(d.lon), hasValidityFlag ? (valid === 1 || valid === true) : true);
   }
   if (d.csq !== undefined) {
     const csq = d.csq;

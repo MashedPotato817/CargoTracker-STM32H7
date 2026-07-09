@@ -73,9 +73,9 @@ hover：显示 "设备位置" tooltip
 
 ### 移动端适配
 
-- 地图高度：240px（桌面）/ 200px（手机）
-- 触摸拖动正常
-- 不拦截页面滚动（`dragging: false` 时 fallback）
+- 地图宽度固定跟随卡片 `width: 100%`
+- 地图高度：260px，保证答辩截图中地图信息足够完整
+- 触摸拖动正常，不额外拦截页面滚动
 
 ## 实现要点
 
@@ -92,14 +92,22 @@ hover：显示 "设备位置" tooltip
 ### 核心 JS 逻辑
 
 ```js
-// 初始化地图（默认视野中国居中）
+// 初始化地图（默认视野长三角居中）
 const map = L.map('map-container', {
-  attributionControl: false,  // 简洁，去掉 OSM 版权
+  attributionControl: false,
   zoomControl: true,
-}).setView([35.86, 104.19], 5);
+  preferCanvas: true,
+  fadeAnimation: false,
+  maxBounds: [[27.0, 116.0], [35.5, 123.0]],
+  maxBoundsViscosity: 0.8,
+  minZoom: 7,
+}).setView([31.2, 120.5], 9);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
+  updateWhenIdle: false,
+  keepBuffer: 3,
+  crossOrigin: true,
 }).addTo(map);
 
 // 设备 marker
@@ -107,9 +115,12 @@ let deviceMarker = null;
 let firstFix = true;
 
 function updateMap(lat, lon, valid) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return;
+  }
+
   if (!valid) {
-    // 定位无效：marker 变灰
-    if (deviceMarker) deviceMarker.setOpacity(0.4);
+    if (deviceMarker) deviceMarker.setStyle({ fillColor: '#6b7280', color: '#6b7280' });
     return;
   }
 
@@ -130,8 +141,10 @@ function updateMap(lat, lon, valid) {
   }
 
   if (firstFix) {
-    map.setView(pos, 15);  // 首次定位：飞到设备位置
+    map.setView(pos, 15, { animate: true });
     firstFix = false;
+  } else {
+    map.panTo(pos, { animate: true, duration: 0.4 });
   }
 }
 ```
@@ -144,7 +157,8 @@ function updateUI(d) {
 
   if (d.lat !== undefined && d.lon !== undefined) {
     const valid = (d.gps_v !== undefined ? d.gps_v : d.gps_valid);
-    updateMap(d.lat, d.lon, valid === 1 || valid === true);
+    const hasValidityFlag = valid !== undefined && valid !== null;
+    updateMap(Number(d.lat), Number(d.lon), hasValidityFlag ? (valid === 1 || valid === true) : true);
     // 同时更新地图上方的经纬度文字
     document.getElementById('lat-val').textContent = d.lat.toFixed(4);
     document.getElementById('lon-val').textContent = d.lon.toFixed(4);
@@ -159,19 +173,37 @@ Leaflet 默认白色底，需要 CSS 覆盖匹配 dashboard 暗色风格：
 ```css
 /* 地图容器 */
 #map-container {
-  height: 240px;
+  width: 100%;
+  height: 260px;
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* 暗色瓦片：使用 CartoDB dark 或 CSS filter */
+/* 暗色瓦片：使用 OSM 标准瓦片 + CSS filter */
 .leaflet-tile {
-  filter: brightness(0.6) saturate(0.5) invert(1) hue-rotate(180deg);
+  filter: brightness(0.55) contrast(1.15) saturate(0.55) invert(1) hue-rotate(180deg);
 }
-/* 或者换暗色 tile 源 */
 ```
 
-> 简易方案：CSS `filter` 反色，效果足够。想要更好可以换 CartoDB dark tiles（`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`），同样免费无需 Key。
+> 实测 CartoDB retina 瓦片写法在当前页面中容易出现右侧/下方色块；已改为 OpenStreetMap 标准瓦片并用 CSS 滤镜适配暗色主题。
+
+### 地图刷新修复
+
+Leaflet 在窄卡片内初始化时，可能先按旧容器尺寸计算瓦片，导致地图只加载左上部分。当前代码新增：
+
+```js
+function refreshMapSize() {
+  requestAnimationFrame(() => {
+    map.invalidateSize({ pan: false });
+    setTimeout(() => map.invalidateSize({ pan: false }), 200);
+  });
+}
+
+window.addEventListener('load', refreshMapSize);
+window.addEventListener('resize', refreshMapSize);
+```
+
+在页面加载、窗口变化、坐标更新时刷新 Leaflet 尺寸，避免地图区域出现未铺满色块。
 
 ### 轨迹线（可选）
 
@@ -191,22 +223,21 @@ trail.setLatLngs(trailPoints);
 
 | 文件 | 操作 | 行数估计 |
 |------|:---:|:---:|
-| `dashboard.html` | 修改 | +60 行（HTML 容器 + JS 逻辑 + CSS） |
+| `dashboard.html` | 修改 | 地图 UI + Leaflet 尺寸刷新 + OSM 暗色滤镜 |
 
 无需新建文件，全部在 dashboard.html 内完成。
 
 ## 验证
 
-```
-1. 打开 dashboard.html → 地图显示中国全景 + "等待定位…"
-2. 硬件上电 → MQTT 上报 lat/lon → 地图自动飞到设备位置 + 蓝色标记
-3. 设备移动（GPS 坐标变化）→ marker 跟随移动
-4. gps_valid=0 → marker 变灰
-5. 手机端打开 → 地图可触摸拖动，不卡页面滚动
-```
+- [x] 打开 dashboard.html → 地图完整铺满卡片，无右侧/底部色块
+- [x] MQTT 页面保持连接，截图中显示 `已连接`
+- [x] Telemetry 上报温湿度后，实时环境和最后上报时间正常更新
+- [x] `gps_valid=0` 时页面显示 `定位 No`，地图保留默认长三角视野
+- [ ] 真实 GPS 有效定位后 marker 跳转/跟随移动（待硬件 GPS 输出有效经纬度）
+
+> 2026-07-09 页面截图确认：地图已完整显示长三角区域，原先右侧/下方 Leaflet 背景色块消失。
 
 ## 参考
 
 - Leaflet.js 文档：https://leafletjs.com/reference.html
 - OpenStreetMap Tile Usage：https://operations.osmfoundation.org/policies/tiles/
-- CartoDB Dark Matter tiles：`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`

@@ -60,8 +60,8 @@
 
 ## 🟡 Task 3.5: 地图实时定位显示
 
-**负责人：C** | 预计：1h | 状态：📄 方案已写
+**负责人：C** | 预计：1h | 状态：✅ 页面显示已完成，⚠️ marker 跟随待真实 GPS 验证
 
-dashboard.html 嵌入 Leaflet 地图，根据 GPS 经纬度实时显示设备位置。
+dashboard.html 嵌入 Leaflet 地图，根据 GPS 经纬度实时显示设备位置。已修复实际页面中地图瓦片右侧/底部未铺满的问题，当前截图验证地图可完整显示长三角区域。
 
 详见 `doc-workflow/task3.5.md`。
