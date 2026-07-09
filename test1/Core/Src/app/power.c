@@ -9,16 +9,16 @@
 void Power_Init(void)
 {
     Power_Air780E_SetPwrKey(0);
-#if defined(AIR780E_PWRKEY_GPIO_Port) && defined(AIR780E_PWRKEY_Pin)
-    printf("[Power] init OK (Stop Mode stub, Air780E PWRKEY GPIO ready)\n");
-#else
-    printf("[Power] init OK (Stop Mode stub, Air780E PWRKEY not configured)\n");
-#endif
+    printf("[Power] init OK (Sleep Mode ready)\n");
 }
 
 void Power_EnterStopStub(void)
 {
-    printf("[Power] enter sleep stub, waiting next activation\n");
+    printf("[Power] enter Sleep Mode (CPU off, wake on IRQ)\n");
+    HAL_SuspendTick();
+    HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+    HAL_ResumeTick();
+    printf("[Power] wake from Sleep\n");
 }
 
 void Power_Air780E_PowerOn(void)

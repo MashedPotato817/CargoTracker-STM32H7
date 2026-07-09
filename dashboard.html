@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CargoTracker 云端控制台</title>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      onerror="this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        onerror="document.write('<script src=\'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js\'><\/script>')"></script>
 <style>
 :root {
   --bg: #0a0d14; --card: #131620; --border: #1e2230;
@@ -195,6 +197,13 @@ setInterval(() => {
 }, 2000);
 
 /* ---------- Leaflet 地图 ---------- */
+/* Leaflet 未加载时安全退出 */
+if (typeof L === 'undefined') {
+  console.warn('Leaflet.js 未加载，地图功能不可用');
+  document.getElementById('map-container').innerHTML =
+    '<div style="padding:40px;text-align:center;color:var(--dim)">地图加载失败<br><small>请检查网络连接</small></div>';
+} else {
+(() => {
 /* 华东范围：江浙沪 + 周边缓冲区 */
 const EAST_CHINA_BOUNDS = [[27.0, 116.0], [35.5, 123.0]];
 
@@ -214,6 +223,23 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   keepBuffer: 3,
   crossOrigin: true,
 }).addTo(map);
+
+/* 移动端：页面加载后强制重算尺寸 */
+setTimeout(() => { map.invalidateSize(); }, 200);
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { map.invalidateSize(); }, 100);
+});
+
+/* 瓦片加载失败降级提示 */
+let tileError = false;
+map.on('tileerror', () => {
+  if (!tileError) {
+    tileError = true;
+    console.warn('地图瓦片加载失败，可能网络受限');
+    document.getElementById('map-container').style.background =
+      'linear-gradient(135deg, #1a1e2a 0%, #131620 100%)';
+  }
+});
 
 let deviceMarker = null;
 let firstFix = true;
@@ -263,6 +289,9 @@ function updateMap(lat, lon, valid) {
     map.panTo(pos, { animate: true, duration: 0.4 });
   }
 }
+
+})(); /* 结束 Leaflet IIFE */
+} /* 结束 if (typeof L === 'undefined') */
 
 const client = mqtt.connect(`wss://${BROKER}:${PORT}${PATH}`, {
   clientId: 'dashboard_' + Math.random().toString(16).slice(2, 8),

@@ -14,6 +14,7 @@
 
 void W25Q128_Init(void);
 uint8_t W25Q128_WriteTelemetry(const TelemetryData *telemetry);
+uint8_t W25Q128_FlushCache(void);
 void W25Q128_Task(void);
 
 #endif

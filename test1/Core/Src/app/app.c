@@ -144,10 +144,14 @@ void App_TaskStateMachine(void)
         StateMachine_Set(STATE_NFC_ACTIVE);
 
         Power_Air780E_PowerOn();  /* 开机脉冲 + 等 5s 启动 */
-        /* Air780E_Init() 和 MQTT_Init() 内部不再调 PowerOn */
         Air780E_Init();
         MQTT_Init();
         Alarm_SetSystemActive(1);
+
+        /* 补发断网时缓存的遥测数据 */
+        if (Air780E_IsNetworkReady()) {
+            W25Q128_FlushCache();
+        }
 
         /* === Air780E 在线，定时上报（10s/次），NFC 刷卡关机 === */
         for (;;) {
@@ -171,9 +175,9 @@ void App_TaskStateMachine(void)
                             break;
                         }
                     }
-                    /* 随时响应 NFC 关机 */
+                    /* NFC 关机检测（200ms 窗口） */
                     if (osMessageQueueGet(queue_activationHandle,
-                                          &activation_event, NULL, 0) == osOK) {
+                                          &activation_event, NULL, 200) == osOK) {
                         printf("[StateMachine] NFC shutdown during GPS\n");
                         goto nfc_shutdown;
                     }
@@ -199,7 +203,7 @@ void App_TaskStateMachine(void)
                         }
                     }
                     if (osMessageQueueGet(queue_activationHandle,
-                                          &activation_event, NULL, 0) == osOK) {
+                                          &activation_event, NULL, 200) == osOK) {
                         printf("[StateMachine] NFC shutdown during SHT31\n");
                         goto nfc_shutdown;
                     }
